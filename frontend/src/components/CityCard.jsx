@@ -1,0 +1,62 @@
+import { TIER_COLORS, STATUS_MAP } from '../constants'
+
+export default function CityCard({ city, onClick, selected, onSelect }) {
+  const tier = city.outreach_tier || 3
+
+  return (
+    <div
+      className={`bg-white border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow text-sm
+        ${selected ? 'ring-2 ring-blue-500 border-blue-300' : 'border-gray-200'}`}
+      onClick={() => onClick(city)}
+    >
+      <div className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(e) => { e.stopPropagation(); onSelect(city.id, e.target.checked) }}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-0.5 shrink-0"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-semibold text-gray-900 truncate">{city.city_name}</span>
+            <span className={`text-xs px-1.5 py-0.5 rounded border font-medium shrink-0 ${TIER_COLORS[tier]}`}>
+              T{tier}
+            </span>
+          </div>
+
+          <div className="text-gray-500 text-xs mt-0.5 truncate">
+            {city.mayor || <span className="italic text-gray-400">Mayor unknown</span>}
+          </div>
+
+          <div className="text-gray-400 text-xs mt-0.5">
+            {city.county} · {city.population ? `${(city.population / 1000).toFixed(0)}k` : '—'}
+          </div>
+
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {city.moratorium_active && (
+              <span className="bg-orange-100 text-orange-700 text-xs px-1.5 py-0.5 rounded">
+                Moratorium
+              </span>
+            )}
+            {city.is_distressed_county && (
+              <span className="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded">
+                Distressed
+              </span>
+            )}
+            {city.fair_plan_policies > 500 && (
+              <span className="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded">
+                FAIR {city.fair_plan_policies?.toLocaleString()}
+              </span>
+            )}
+            {city.mayor_needs_verification && (
+              <span className="bg-red-100 text-red-600 text-xs px-1.5 py-0.5 rounded">
+                Verify mayor
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
