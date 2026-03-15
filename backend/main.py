@@ -9,18 +9,9 @@ from routers import cities, drafts
 
 app = FastAPI(title="Mayor CRM API")
 
-import os
-
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-]
-if os.environ.get("FRONTEND_URL"):
-    ALLOWED_ORIGINS.append(os.environ["FRONTEND_URL"])
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
