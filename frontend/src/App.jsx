@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getCities, getStats, batchUpdate, generateDrafts, getFilterOptions, getAuthStatus, syncEmails } from './api'
+import { getCities, getStats, batchUpdate, generateDrafts, getFilterOptions, getAuthStatus, syncEmails, getUnreadCities } from './api'
 import KanbanBoard from './components/KanbanBoard'
 import TableView from './components/TableView'
 import CityDetailPanel from './components/CityDetailPanel'
@@ -64,6 +64,7 @@ export default function App() {
   const [generating, setGenerating] = useState(false)
   const [gmailStatus, setGmailStatus] = useState(null)
   const [syncing, setSyncing] = useState(false)
+  const [unreadCityIds, setUnreadCityIds] = useState(new Set())
 
   const loadCities = useCallback(async () => {
     setFetching(true)
@@ -86,9 +87,14 @@ export default function App() {
     getStats().then(setStats).catch(() => {})
   }, [])
 
+  const loadUnread = useCallback(() => {
+    getUnreadCities().then(d => setUnreadCityIds(new Set(d.city_ids))).catch(() => {})
+  }, [])
+
   useEffect(() => {
     getFilterOptions().then(setFilterOptions).catch(() => {})
     getAuthStatus().then(setGmailStatus).catch(() => {})
+    loadUnread()
   }, [])
 
   const handleSync = async () => {
@@ -97,6 +103,7 @@ export default function App() {
       await syncEmails()
       await loadCities()
       getAuthStatus().then(setGmailStatus)
+      loadUnread()
     } finally {
       setSyncing(false)
     }
@@ -376,6 +383,7 @@ export default function App() {
             batchId={reviewBatchId}
             expectedCount={reviewCityCount}
             onBack={() => setView('kanban')}
+            onSend={() => { loadCities(); loadUnread() }}
           />
         ) : loading ? (
           view === 'table' ? (
@@ -400,6 +408,7 @@ export default function App() {
             onCityClick={setActiveCity}
             selected={selected}
             onSelect={handleSelect}
+            unreadCityIds={unreadCityIds}
           />
         ) : (
           <TableView

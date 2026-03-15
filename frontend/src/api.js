@@ -35,3 +35,5 @@ export const regenerateDraft = (id) => api.post(`/drafts/${id}/regenerate`).then
 export const getAuthStatus = () => api.get('/auth/status').then(r => r.data)
 export const sendDrafts = (draft_ids) => api.post('/drafts/send', { draft_ids }).then(r => r.data)
 export const syncEmails = () => api.post('/emails/sync').then(r => r.data)
+export const getUnreadCities = () => api.get('/emails/unread-cities').then(r => r.data)
+export const markEmailsRead = (cityId) => api.post(`/emails/city/${cityId}/read`).then(r => r.data)

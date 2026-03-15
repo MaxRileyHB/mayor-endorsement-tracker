@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { updateCity, getActivity, getCityDrafts, getCityEmails, getCityCalls, createCallLog, deleteCallLog, updateDraft, regenerateDraft, generateDrafts } from '../api'
+import { updateCity, getCity, getActivity, getCityDrafts, getCityEmails, getCityCalls, createCallLog, deleteCallLog, updateDraft, regenerateDraft, generateDrafts, sendDrafts, markEmailsRead } from '../api'
 import { STATUSES, TIER_COLORS } from '../constants'
 import { SkeletonSection } from './Skeleton'
 
@@ -32,6 +32,7 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
   const [loadingEmails, setLoadingEmails] = useState(false)
   const [calls, setCalls] = useState([])
   const [loggingCall, setLoggingCall] = useState(false)
+  const [sending, setSending] = useState(false)
 
   useEffect(() => {
     if (!city) return
@@ -48,6 +49,7 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
     getCityDrafts(city.id).then(setDrafts).catch(() => {}).finally(() => setLoadingDrafts(false))
     getCityEmails(city.id).then(setEmails).catch(() => {}).finally(() => setLoadingEmails(false))
     getCityCalls(city.id).then(setCalls).catch(() => {})
+    markEmailsRead(city.id).catch(() => {})
   }, [city?.id])
 
   // Poll for new draft after clicking generate
@@ -130,6 +132,29 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
     setDrafting(draft?.draft_type || 'endorsement_outreach')
   }
 
+  const handleSend = async () => {
+    const toSend = drafts.filter(d => d.status === 'approved' || d.status === 'edited')
+    if (!toSend.length) return
+    setSending(true)
+    // Optimistic: mark them sent
+    setDrafts(prev => prev.map(d => toSend.find(s => s.id === d.id) ? { ...d, status: 'sent' } : d))
+    try {
+      const result = await sendDrafts(toSend.map(d => d.id))
+      // Reload drafts and city to reflect status advance
+      getCityDrafts(city.id).then(setDrafts).catch(() => {})
+      if (result.failed?.length) {
+        alert(`Sent ${result.sent}. ${result.failed.length} failed — check Gmail is connected.`)
+      }
+      // Refresh city to reflect auto-advanced status
+      getCity(city.id).then(onUpdate).catch(() => {})
+    } catch {
+      alert('Send failed — make sure Gmail is connected.')
+      getCityDrafts(city.id).then(setDrafts).catch(() => {})
+    } finally {
+      setSending(false)
+    }
+  }
+
   const flags = [
     city.moratorium_active && { label: 'Active Moratorium', color: 'bg-orange-100 text-orange-700' },
     city.is_distressed_county && { label: 'Distressed County', color: 'bg-amber-100 text-amber-700' },
@@ -205,14 +230,26 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
           {/* Drafts */}
           {(drafts.length > 0 || drafting || loadingDrafts) && (
             <section>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
-                Drafts
-                {activeDrafts.length > 0 && (
-                  <span className="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full font-medium">
-                    {activeDrafts.length}
-                  </span>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
+                  Drafts
+                  {activeDrafts.length > 0 && (
+                    <span className="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full font-medium">
+                      {activeDrafts.length}
+                    </span>
+                  )}
+                </h3>
+                {drafts.some(d => d.status === 'approved' || d.status === 'edited') && (
+                  <button
+                    onClick={handleSend}
+                    disabled={sending}
+                    className="bg-green-600 text-white text-xs px-2.5 py-1 rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {sending && <Spinner />}
+                    Send {drafts.filter(d => d.status === 'approved' || d.status === 'edited').length} approved
+                  </button>
                 )}
-              </h3>
+              </div>
 
               <div className="space-y-2">
                 {/* Initial load skeleton */}

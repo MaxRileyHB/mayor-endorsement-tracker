@@ -76,6 +76,7 @@ class Email(Base):
     body_preview = Column(Text)
     sent_at = Column(DateTime)
     is_draft = Column(Boolean, default=False)
+    is_read = Column(Boolean, default=True, server_default='true')
     draft_type = Column(String(50))
     draft_status = Column(String(50))
     created_at = Column(DateTime, server_default=func.now())

@@ -29,11 +29,13 @@ class SendRequest(BaseModel):
 
 
 def _build_message(to: str, subject: str, body: str, from_email: str) -> dict:
+    # Normalize line endings so the email renders cleanly
+    body = body.replace('\r\n', '\n').replace('\r', '\n')
     message = MIMEMultipart("alternative")
     message["To"] = to
     message["From"] = f"{FROM_NAME} <{from_email}>"
     message["Subject"] = subject
-    message.attach(MIMEText(body, "plain"))
+    message.attach(MIMEText(body, "plain", "utf-8"))
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     return {"raw": raw}
 
@@ -98,7 +100,7 @@ def send_drafts(payload: SendRequest, db: Session = Depends(get_db)):
                 from_address=from_email,
                 to_address=recipient,
                 subject=draft.subject,
-                body_preview=draft.body[:300] if draft.body else "",
+                body_preview=draft.body or "",
                 sent_at=datetime.now(timezone.utc),
                 is_draft=False,
                 draft_type=draft.draft_type,
@@ -207,8 +209,8 @@ def sync_emails(db: Session = Depends(get_db)):
         our_email = profile["emailAddress"].lower()
         direction = "outbound" if from_email == our_email else "inbound"
 
-        # Extract body
-        body_preview = _extract_body(msg.get("payload", {}))[:300]
+        # Extract body (full, no truncation)
+        body_preview = _extract_body(msg.get("payload", {}))
 
         # Match to city
         city_id = _match_city(db, from_email, to_email, thread_id)
@@ -224,6 +226,7 @@ def sync_emails(db: Session = Depends(get_db)):
             body_preview=body_preview,
             sent_at=sent_at,
             is_draft=False,
+            is_read=(direction == "outbound"),  # inbound starts unread
         )
         db.add(email)
         synced += 1
@@ -256,6 +259,22 @@ def _extract_body(payload: dict) -> str:
             return result
 
     return ""
+
+
+@router.get("/emails/unread-cities")
+def get_unread_cities(db: Session = Depends(get_db)):
+    rows = db.query(Email.city_id).filter(
+        Email.is_read == False,
+        Email.city_id.isnot(None),
+    ).distinct().all()
+    return {"city_ids": [r[0] for r in rows]}
+
+
+@router.post("/emails/city/{city_id}/read")
+def mark_city_emails_read(city_id: int, db: Session = Depends(get_db)):
+    db.query(Email).filter(Email.city_id == city_id).update({"is_read": True})
+    db.commit()
+    return {"ok": True}
 
 
 def _match_city(db: Session, from_email: str, to_email: str, thread_id: str | None) -> int | None:

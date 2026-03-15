@@ -3,13 +3,14 @@ import { getDrafts, updateDraft, getBatchStatus, regenerateDraft, sendDrafts } f
 import { TIER_COLORS } from '../constants'
 import { SkeletonDraftCard } from './Skeleton'
 
-const STATUS_FILTERS = ['all', 'pending_review', 'approved', 'edited', 'rejected']
+const STATUS_FILTERS = ['all', 'pending_review', 'approved', 'edited', 'rejected', 'sent']
 const STATUS_LABELS = {
   all: 'All',
   pending_review: 'Pending',
   approved: 'Approved',
   edited: 'Edited',
   rejected: 'Rejected',
+  sent: 'Sent',
 }
 const STATUS_COLORS = {
   pending_review: 'bg-amber-100 text-amber-700',
@@ -19,7 +20,7 @@ const STATUS_COLORS = {
   sent: 'bg-gray-100 text-gray-500',
 }
 
-export default function ReviewQueue({ batchId, expectedCount, onBack }) {
+export default function ReviewQueue({ batchId, expectedCount, onBack, onSend }) {
   const [drafts, setDrafts] = useState([])
   const [filter, setFilter] = useState('all')
   const [cardSearch, setCardSearch] = useState('')
@@ -272,6 +273,7 @@ export default function ReviewQueue({ batchId, expectedCount, onBack }) {
                 const ids = drafts.filter(d => d.status === 'approved' || d.status === 'edited').map(d => d.id)
                 const result = await sendDrafts(ids)
                 await load()
+                onSend?.()
                 if (result.failed?.length) {
                   alert(`Sent ${result.sent}. ${result.failed.length} failed — check that Gmail is connected.`)
                 }
@@ -305,6 +307,10 @@ function DraftCard({ draft, selected, onToggleSelect, onPatch, onRegenerate }) {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (draft.status === 'sent') {
+    return <SentDraftCard draft={draft} />
   }
 
   return (
@@ -422,6 +428,43 @@ function DraftCard({ draft, selected, onToggleSelect, onPatch, onRegenerate }) {
           </pre>
         )}
       </div>
+    </div>
+  )
+}
+
+function SentDraftCard({ draft }) {
+  const [expanded, setExpanded] = useState(false)
+  const tier = draft.research_context?.tier || 3
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden opacity-75">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm text-gray-500">{draft.city_name}</span>
+            <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${TIER_COLORS[tier]}`}>T{tier}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 font-medium flex items-center gap-1">
+              ✓ Sent
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-0.5 truncate">To: {draft.to_address || '—'}</p>
+        </div>
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+        >
+          {expanded ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      <div className="px-4 pb-2">
+        <p className="text-xs text-gray-400"><span className="text-gray-300">Subject:</span> {draft.subject}</p>
+      </div>
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-gray-200 pt-3">
+          <pre className="text-sm text-gray-500 whitespace-pre-wrap font-sans leading-relaxed">
+            {draft.body}
+          </pre>
+        </div>
+      )}
     </div>
   )
 }

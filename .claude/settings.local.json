@@ -54,7 +54,21 @@
       "Bash(cd C:/Users/MaxRi/MayorEndorsementTracker/pipeline && py -u verify_mayors.py --test 20 2>&1)",
       "Bash(cd C:/Users/MaxRi/MayorEndorsementTracker/pipeline && py -u verify_mayors.py 2>&1)",
       "Bash(cd C:/Users/MaxRi/MayorEndorsementTracker/frontend && npm install && npm install -D tailwindcss @tailwindcss/vite && npm install axios 2>&1 | tail -10)",
-      "Bash(cd C:/Users/MaxRi/MayorEndorsementTracker/frontend && npm install -D tailwindcss @tailwindcss/vite --legacy-peer-deps && npm install axios 2>&1 | tail -5)"
+      "Bash(cd C:/Users/MaxRi/MayorEndorsementTracker/frontend && npm install -D tailwindcss @tailwindcss/vite --legacy-peer-deps && npm install axios 2>&1 | tail -5)",
+      "Bash(py -c \"\nimport json\nwith open\\('C:/Users/MaxRi/MayorEndorsementTracker/pipeline/output/verification_log.json'\\) as f:\n    log = json.load\\(f\\)\n\nflags = [e for e in log if e['action'] in \\('flagged', 'no_results'\\)]\nupdated = [e for e in log if e['action'] == 'updated']\nrotated = [e for e in log if e['action'] == 'pro_tem_rotated']\nconfirmed = [e for e in log if e['action'] == 'confirmed']\n\nprint\\(f'Total cities: {len\\(log\\)}'\\)\nprint\\(f'Confirmed: {len\\(confirmed\\)}'\\)\nprint\\(f'Pro tem rotated: {len\\(rotated\\)}'\\)\nprint\\(f'Updated \\(new mayor\\): {len\\(updated\\)}'\\)\nprint\\(f'Flagged/no results: {len\\(flags\\)}'\\)\nprint\\(\\)\nprint\\('=== FLAGS ==='\\)\nfor e in flags:\n    print\\(f\\\\\"[{e['action'].upper\\(\\)}] {e['city_name']}\\\\\"\\)\n    print\\(f\\\\\"  roster: {e['roster_mayor']}\\\\\"\\)\n    print\\(f\\\\\"  notes: {e['notes']}\\\\\"\\)\n    print\\(\\)\n\")",
+      "Bash(python -c \"import fastapi, uvicorn, sqlalchemy, psycopg2, dotenv, anthropic; print\\('All backend deps OK'\\)\" 2>&1)",
+      "Bash(py --version 2>&1 && py -c \"import fastapi\" 2>&1 || echo \"need install\")",
+      "Bash(py -c \"import fastapi, uvicorn, sqlalchemy, psycopg2, dotenv, anthropic; print\\('OK'\\)\" 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\MaxRi\\\\MayorEndorsementTracker\" && python -c \"\nimport json\nwith open\\('pipeline/output/roster_cities.json'\\) as f:\n    cities = json.load\\(f\\)\nsamples = [\\(c.get\\('city_name'\\), c.get\\('state_senate_district'\\), c.get\\('state_assembly_district'\\), c.get\\('congressional_district'\\)\\) for c in cities[:20] if any\\([c.get\\('state_senate_district'\\), c.get\\('state_assembly_district'\\), c.get\\('congressional_district'\\)]\\)]\nfor s in samples[:15]:\n    print\\(s\\)\n\")",
+      "Bash(cd \"C:\\\\Users\\\\MaxRi\\\\MayorEndorsementTracker\" && py -c \"\nimport json\nwith open\\('pipeline/output/roster_cities.json'\\) as f:\n    cities = json.load\\(f\\)\nsamples = [\\(c.get\\('city_name'\\), c.get\\('state_senate_district'\\), c.get\\('state_assembly_district'\\), c.get\\('congressional_district'\\)\\) for c in cities if any\\([c.get\\('state_senate_district'\\), c.get\\('state_assembly_district'\\), c.get\\('congressional_district'\\)]\\)]\nfor s in samples[:20]:\n    print\\(s\\)\n\")",
+      "Bash(cd \"C:\\\\Users\\\\MaxRi\\\\MayorEndorsementTracker\\\\backend\" && py fix_districts.py 2>&1 | tail -5)",
+      "Bash(cd \"C:\\\\Users\\\\MaxRi\\\\MayorEndorsementTracker\\\\backend\" && py fix_districts.py 2>&1 | tail -10)",
+      "Bash(cd /c/Users/MaxRi/MayorEndorsementTracker && curl -s http://localhost:8000/api/cities/filter-options 2>&1 | head -100)",
+      "Bash(curl -s http://localhost:5173/api/cities/filter-options 2>&1 | head -50)",
+      "Bash(curl -s http://localhost:5173/ | head -20)",
+      "Bash(curl -s \"http://localhost:5173/src/api.js\" | head -30)",
+      "Bash(cd /c/Users/MaxRi/MayorEndorsementTracker/backend && python -c \"from database import engine; import models; models.Base.metadata.create_all\\(bind=engine\\); print\\('Tables created'\\)\" 2>&1)",
+      "Bash(git add:*)"
     ]
   }
 }

@@ -1,12 +1,12 @@
 import { TIER_COLORS, STATUS_MAP } from '../constants'
 
-export default function CityCard({ city, onClick, selected, onSelect }) {
+export default function CityCard({ city, onClick, selected, onSelect, hasUnread = false }) {
   const tier = city.outreach_tier || 3
 
   return (
     <div
       className={`bg-white border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow text-sm
-        ${selected ? 'ring-2 ring-blue-500 border-blue-300' : 'border-gray-200'}`}
+        ${selected ? 'ring-2 ring-blue-500 border-blue-300' : hasUnread ? 'border-green-400 ring-1 ring-green-300' : 'border-gray-200'}`}
       onClick={() => onClick(city)}
     >
       <div className="flex items-start gap-2">
@@ -23,6 +23,11 @@ export default function CityCard({ city, onClick, selected, onSelect }) {
             <span className={`text-xs px-1.5 py-0.5 rounded border font-medium shrink-0 ${TIER_COLORS[tier]}`}>
               T{tier}
             </span>
+            {hasUnread && (
+              <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full font-medium shrink-0">
+                New
+              </span>
+            )}
           </div>
 
           <div className="text-gray-500 text-xs mt-0.5 truncate">

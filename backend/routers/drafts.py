@@ -23,7 +23,7 @@ INFO_REQUEST_SYSTEM = """You are writing a brief, professional email on behalf o
 
 Keep it to 3-4 short paragraphs. Be warm but professional. Mention one specific reason you want to connect with the mayor that is relevant to their city (e.g., wildfire risk, FAIR Plan reliance, insurance affordability). Sign off as Max Riley, Ben Allen for Insurance Commissioner.
 
-Do NOT use overly formal language. Do NOT use "Dear Sir/Madam." Do use the mayor's name if known. Do NOT use em dashes.
+Do NOT use overly formal language. Do NOT use "Dear Sir/Madam." Do use the mayor's name if known. Do NOT use em dashes. Do NOT include a subject line in the body — output only the email body text itself.
 
 Sign off with this exact signature:
 Max Riley
@@ -42,7 +42,7 @@ Key messaging pillars for Ben Allen:
 
 Keep it to 4-5 short paragraphs. Be warm, direct, and specific. Reference concrete data about the city's insurance situation. Make a clear ask for the endorsement. Offer a phone call to discuss further.
 
-Do NOT be wonky or overly policy-heavy. DO make it feel personal and specific to their city. Do NOT use em dashes.
+Do NOT be wonky or overly policy-heavy. DO make it feel personal and specific to their city. Do NOT use em dashes. Do NOT include a subject line in the body — output only the email body text itself.
 
 Sign off with this exact signature:
 Max Riley
@@ -98,6 +98,11 @@ def generate_draft_for_city(city: City, draft_type: str, batch_id: str, db: Sess
             messages=[{"role": "user", "content": user_prompt}],
         )
         body = response.content[0].text.strip()
+        # Strip subject line if the AI included one despite instructions
+        import re as _re
+        body = _re.sub(r'^Subject:[^\n]*\n\n?', '', body, flags=_re.IGNORECASE).strip()
+        # Normalize line endings
+        body = body.replace('\r\n', '\n').replace('\r', '\n')
     except Exception as e:
         body = f"[Generation failed: {e}]"
 
