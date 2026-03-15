@@ -1,10 +1,12 @@
 import os
-from fastapi import APIRouter, Depends
+from urllib.parse import urlencode
+
+import requests as http_requests
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 from sqlalchemy.orm import Session
-from google_auth_oauthlib.flow import Flow
-import google.oauth2.id_token
-import google.auth.transport.requests
 
 from database import get_db
 import gmail_client
@@ -19,47 +21,59 @@ SCOPES = [
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 
-def _make_flow():
-    return Flow.from_client_config(
-        {
-            "web": {
-                "client_id": gmail_client.CLIENT_ID,
-                "client_secret": gmail_client.CLIENT_SECRET,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [gmail_client.REDIRECT_URI],
-            }
-        },
-        scopes=SCOPES,
-        redirect_uri=gmail_client.REDIRECT_URI,
-    )
-
-
 @router.get("/gmail")
 def gmail_auth_start():
     """Redirect browser to Google OAuth consent screen."""
-    flow = _make_flow()
-    auth_url, _ = flow.authorization_url(
-        access_type="offline",
-        include_granted_scopes="true",
-        prompt="consent",  # force refresh token to be returned every time
-    )
+    params = {
+        "client_id": gmail_client.CLIENT_ID,
+        "redirect_uri": gmail_client.REDIRECT_URI,
+        "response_type": "code",
+        "scope": " ".join(SCOPES),
+        "access_type": "offline",
+        "prompt": "consent",
+    }
+    auth_url = "https://accounts.google.com/o/oauth2/auth?" + urlencode(params)
     return RedirectResponse(auth_url)
 
 
 @router.get("/gmail/callback")
 def gmail_auth_callback(code: str, db: Session = Depends(get_db)):
-    """Handle OAuth callback, store tokens, redirect to frontend."""
-    flow = _make_flow()
-    flow.fetch_token(code=code)
+    """Exchange auth code for tokens and store them."""
+    # Direct token exchange — no PKCE library magic
+    resp = http_requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "client_id": gmail_client.CLIENT_ID,
+            "client_secret": gmail_client.CLIENT_SECRET,
+            "code": code,
+            "redirect_uri": gmail_client.REDIRECT_URI,
+            "grant_type": "authorization_code",
+        },
+    )
 
-    creds = flow.credentials
-    refresh_token = creds.refresh_token
-    access_token = creds.token
+    if not resp.ok:
+        raise HTTPException(status_code=400, detail=f"Token exchange failed: {resp.text}")
 
-    # Get the connected email address
-    import googleapiclient.discovery
-    service = googleapiclient.discovery.build("gmail", "v1", credentials=creds)
+    tokens = resp.json()
+    refresh_token = tokens.get("refresh_token")
+    access_token = tokens.get("access_token")
+
+    if not refresh_token:
+        raise HTTPException(
+            status_code=400,
+            detail="No refresh token returned. Revoke app access in your Google account and try again.",
+        )
+
+    # Get connected email address
+    creds = Credentials(
+        token=access_token,
+        refresh_token=refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=gmail_client.CLIENT_ID,
+        client_secret=gmail_client.CLIENT_SECRET,
+        scopes=SCOPES,
+    )
+    service = build("gmail", "v1", credentials=creds)
     profile = service.users().getProfile(userId="me").execute()
     email = profile.get("emailAddress", "")
 
