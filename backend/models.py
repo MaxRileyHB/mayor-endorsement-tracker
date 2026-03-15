@@ -36,9 +36,9 @@ class City(Base):
     mayor_contact_source = Column(String(255))
 
     # Political
-    congressional_district = Column(String(10))
-    state_senate_district = Column(String(10))
-    state_assembly_district = Column(String(10))
+    congressional_district = Column(Text)
+    state_senate_district = Column(Text)
+    state_assembly_district = Column(Text)
     party_affiliation = Column(String(50))
 
     # Insurance relevance
@@ -96,6 +96,18 @@ class Draft(Base):
     created_at = Column(DateTime, server_default=func.now())
     reviewed_at = Column(DateTime)
     sent_at = Column(DateTime)
+
+
+class CallLog(Base):
+    __tablename__ = "call_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    city_id = Column(Integer, index=True)
+    notes = Column(Text)
+    outcome = Column(String(50))  # reached, voicemail, no_answer
+    contact_type = Column(String(20))  # mayor, city
+    called_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now())
 
 
 class ActivityLog(Base):

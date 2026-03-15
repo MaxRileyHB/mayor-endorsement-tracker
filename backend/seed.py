@@ -28,7 +28,8 @@ def seed():
 
     print(f"Loaded {len(cities_data)} cities from {PIPELINE_OUTPUT}")
 
-    # Create tables
+    # Drop and recreate tables to ensure schema is current
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
@@ -43,7 +44,7 @@ def seed():
         field_map = {
             "city_name": "city_name",
             "county": "county",
-            "population_2025": "population",
+            "population": "population",
             "incorporated_date": "incorporated_date",
             "mayor": "mayor",
             "mayor_pro_tem": "mayor_pro_tem",
@@ -53,11 +54,11 @@ def seed():
             "city_manager": "city_manager",
             "city_clerk": "city_clerk",
             "city_attorney": "city_attorney",
-            "address": "city_address",
-            "phone": "city_phone",
-            "fax": "city_fax",
-            "website": "city_website",
-            "email": "city_email",
+            "city_address": "city_address",
+            "city_phone": "city_phone",
+            "city_fax": "city_fax",
+            "city_website": "city_website",
+            "city_email": "city_email",
             "office_hours": "office_hours",
             "congressional_district": "congressional_district",
             "state_senate_district": "state_senate_district",
@@ -69,7 +70,7 @@ def seed():
             "moratorium_fires": "moratorium_fires",
             "moratorium_active": "moratorium_active",
             "wildfire_risk_tier": "wildfire_risk_tier",
-            "tier": "outreach_tier",
+            "outreach_tier": "outreach_tier",
         }
 
         inserted = 0

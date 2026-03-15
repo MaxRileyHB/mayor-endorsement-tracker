@@ -97,6 +97,45 @@ class DraftRead(BaseModel):
     body: Optional[str] = None
     status: str
     batch_id: Optional[str] = None
+    research_context: Optional[Any] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class EmailRead(BaseModel):
+    id: int
+    city_id: int
+    direction: Optional[str] = None
+    from_address: Optional[str] = None
+    to_address: Optional[str] = None
+    subject: Optional[str] = None
+    body_preview: Optional[str] = None
+    sent_at: Optional[datetime] = None
+    is_draft: Optional[bool] = False
+    draft_type: Optional[str] = None
+    draft_status: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CallLogCreate(BaseModel):
+    notes: Optional[str] = None
+    outcome: Optional[str] = None
+    contact_type: Optional[str] = None
+    called_at: Optional[datetime] = None
+
+
+class CallLogRead(BaseModel):
+    id: int
+    city_id: int
+    notes: Optional[str] = None
+    outcome: Optional[str] = None
+    contact_type: Optional[str] = None
+    called_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
     class Config:

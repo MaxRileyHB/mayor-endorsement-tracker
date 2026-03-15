@@ -16,6 +16,7 @@ Output: output/california_cities.json — one record per city, ready for DB seed
 import json
 import re
 import csv
+import unicodedata
 from pathlib import Path
 from utils import DATA_DIR, OUTPUT_DIR
 
@@ -23,11 +24,30 @@ from utils import DATA_DIR, OUTPUT_DIR
 # Helpers
 # ─────────────────────────────────────────────
 
+# DOF uses different names for a handful of cities
+DOF_NAME_OVERRIDES = {
+    "paso robles": "el paso de robles",
+    "amador city": "amador",
+    "angels camp": "angels city",
+}
+
+# ZIP crosswalk uses different names for a handful of cities
+ZIP_NAME_OVERRIDES = {
+    "st helena": "saint helena",
+    "san buenaventura": "ventura",
+    "carmel-by-the-sea": "carmel",
+}
+
 def normalize_city_name(name):
-    """Strip 'City of', 'Town of', extra whitespace; lowercase for comparison."""
+    """Strip 'City of', 'Town of', diacritics, parentheticals, periods; lowercase."""
     if not name:
         return ""
     name = re.sub(r'^(city|town)\s+of\s+', '', name.strip(), flags=re.IGNORECASE)
+    name = re.sub(r'\s*\([^)]*\)', '', name)           # strip parentheticals e.g. "(Ventura)"
+    name = name.replace('.', '')                         # strip periods e.g. "St." -> "St"
+    # Strip diacritics: decompose unicode then drop combining chars
+    name = unicodedata.normalize('NFD', name)
+    name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
     name = re.sub(r'\s+', ' ', name).strip().lower()
     return name
 
@@ -247,13 +267,14 @@ def assign_tier(city_data):
 
 def merge_city(roster_city, sources, report):
     city_name = roster_city.get("city_name", "")
-    county_raw = roster_city.get("county", "")
+    county_raw = roster_city.get("county") or ""
     county = re.sub(r'^county\s+of\s+', '', county_raw.strip(), flags=re.IGNORECASE).strip()
 
     # Population from DOF
     norm = normalize_city_name(city_name)
+    dof_norm = DOF_NAME_OVERRIDES.get(norm, norm)
     population = None
-    dof_match = sources["dof"].get(norm)
+    dof_match = sources["dof"].get(dof_norm)
     if not dof_match:
         # Try fuzzy
         matched_key, score = best_match(city_name, list(sources["dof"].keys()), threshold=0.8)

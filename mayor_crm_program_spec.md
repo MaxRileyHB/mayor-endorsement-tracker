@@ -345,26 +345,32 @@ Similar to outreach but references prior communication:
 
 ## 8. Gmail Integration
 
+> **See full plan:** [`gmail_integration_plan.md`](./gmail_integration_plan.md)
+>
+> That document contains the complete architecture, phased build plan, manual Google Cloud setup steps, feature roadmap, risk register, and API endpoint summary. This section is a brief summary only.
+
 ### Setup
-- Max will connect a dedicated campaign Gmail account
-- Use Gmail API (OAuth2) for read/send access
-- Store OAuth tokens securely in Railway environment variables
+- Google Workspace account (`@benallenca.com`) — "Internal" app type, skips Google verification
+- OAuth2 credentials stored in Railway env vars (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`)
+- OAuth tokens (refresh + access) stored in the `settings` DB table — not env vars — so rotated tokens are automatically persisted
+- From name on all outreach: `Max Riley - Ben Allen for Insurance Commissioner`
 
 ### Email Sync
-- On app load and periodically (every 5 minutes or manual trigger), sync recent emails
-- For each email in the campaign inbox:
-  - Extract sender/recipient addresses
-  - Match to cities by: (a) exact match on city_email or mayor_email fields, or (b) domain matching (e.g., email from `@comptoncity.org` matches Compton)
-  - Store in `emails` table linked to city_id
-  - Auto-detect direction (inbound vs outbound)
-- Display email thread chronologically in city detail view
+- On app load and periodically (every 5 minutes via setInterval), call `POST /api/emails/sync`
+- City matching priority: (1) Gmail thread_id match, (2) exact address match on `city_email`/`mayor_email`, (3) domain match against `city_website`
+- Unmatched emails stored with `city_id=NULL` and visible in an unmatched inbox for manual assignment
+- Synced emails appear in the city detail Timeline alongside call logs
 
 ### Sending
 - All sends go through the Gmail API (not SMTP)
-- Every send requires explicit user action (approve button in review queue, or send button in city detail)
-- After sending, email is logged in `emails` table and city's `last_contacted` is updated
-- If draft_type is 'info_request', auto-advance city status to 'info_requested'
-- If draft_type is 'endorsement_outreach', auto-advance city status to 'outreach_sent'
+- Every send requires explicit user action — the "Send N approved" button in the Review Queue
+- After sending: draft marked `sent`, email logged to `emails` table, city `last_contacted` updated
+- Auto-advance city status: `info_request` sent → `info_requested`; `endorsement_outreach` sent → `outreach_sent`
+
+### Build Phases
+- **Phase 1 (core):** Auth flow + `POST /api/drafts/send` + Review Queue send button
+- **Phase 2 (sync):** `POST /api/emails/sync` + Timeline population + auto-sync on load
+- **Phase 3 (reply):** Compose/reply from city detail panel
 
 ---
 

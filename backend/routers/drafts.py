@@ -23,7 +23,12 @@ INFO_REQUEST_SYSTEM = """You are writing a brief, professional email on behalf o
 
 Keep it to 3-4 short paragraphs. Be warm but professional. Mention one specific reason you want to connect with the mayor that is relevant to their city (e.g., wildfire risk, FAIR Plan reliance, insurance affordability). Sign off as Max Riley, Ben Allen for Insurance Commissioner.
 
-Do NOT use overly formal language. Do NOT use "Dear Sir/Madam." Do use the mayor's name if known. Do NOT use em dashes."""
+Do NOT use overly formal language. Do NOT use "Dear Sir/Madam." Do use the mayor's name if known. Do NOT use em dashes.
+
+Sign off with this exact signature:
+Max Riley
+Ben Allen for Insurance Commissioner
+(310) 683-8046 | max@benallenca.gov"""
 
 
 OUTREACH_SYSTEM = """You are writing a personalized endorsement outreach email on behalf of Max Riley from State Senator Ben Allen's campaign for California Insurance Commissioner. The email is to a city mayor requesting their endorsement.
@@ -38,7 +43,11 @@ Key messaging pillars for Ben Allen:
 Keep it to 4-5 short paragraphs. Be warm, direct, and specific. Reference concrete data about the city's insurance situation. Make a clear ask for the endorsement. Offer a phone call to discuss further.
 
 Do NOT be wonky or overly policy-heavy. DO make it feel personal and specific to their city. Do NOT use em dashes.
-Sign off as Max Riley, Ben Allen for Insurance Commissioner."""
+
+Sign off with this exact signature:
+Max Riley
+Ben Allen for Insurance Commissioner
+(310) 683-8046 | max@benallenca.gov"""
 
 
 def generate_draft_for_city(city: City, draft_type: str, batch_id: str, db: Session):
@@ -83,7 +92,7 @@ def generate_draft_for_city(city: City, draft_type: str, batch_id: str, db: Sess
 
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="claude-opus-4-6",
             max_tokens=600,
             system=system,
             messages=[{"role": "user", "content": user_prompt}],
@@ -137,12 +146,15 @@ def generate_drafts(
 @router.get("", response_model=List[DraftRead])
 def list_drafts(
     batch_id: Optional[str] = None,
+    city_id: Optional[int] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(Draft, City.city_name).join(City, Draft.city_id == City.id, isouter=True)
     if batch_id:
         q = q.filter(Draft.batch_id == batch_id)
+    if city_id:
+        q = q.filter(Draft.city_id == city_id)
     if status:
         q = q.filter(Draft.status == status)
     rows = q.order_by(Draft.created_at.desc()).all()
@@ -170,6 +182,18 @@ def update_draft(draft_id: int, update: DraftUpdate, db: Session = Depends(get_d
     result = DraftRead.model_validate(row[0])
     result.city_name = row[1]
     return result
+
+
+@router.post("/{draft_id}/regenerate")
+def regenerate_draft(draft_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    draft = db.query(Draft).filter(Draft.id == draft_id).first()
+    if not draft:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    draft.status = "rejected"
+    db.commit()
+    batch_id = str(uuid.uuid4())[:8]
+    background_tasks.add_task(_run_batch, [draft.city_id], draft.draft_type, batch_id)
+    return {"batch_id": batch_id, "status": "generating"}
 
 
 @router.get("/batch/{batch_id}/status")

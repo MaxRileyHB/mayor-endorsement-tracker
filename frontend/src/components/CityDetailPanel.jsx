@@ -1,19 +1,70 @@
 import { useState, useEffect } from 'react'
-import { updateCity, getActivity } from '../api'
+import { updateCity, getActivity, getCityDrafts, getCityEmails, getCityCalls, createCallLog, deleteCallLog, updateDraft, regenerateDraft, generateDrafts } from '../api'
 import { STATUSES, TIER_COLORS } from '../constants'
+import { SkeletonSection } from './Skeleton'
 
-export default function CityDetailPanel({ city, onClose, onUpdate }) {
-  const [editing, setEditing] = useState({})
+const DRAFT_TYPE_LABEL = { info_request: 'Info Request', endorsement_outreach: 'Outreach' }
+const DRAFT_TYPE_COLOR = { info_request: 'bg-amber-100 text-amber-700', endorsement_outreach: 'bg-blue-100 text-blue-700' }
+const DRAFT_STATUS_COLOR = {
+  pending_review: 'bg-amber-100 text-amber-700',
+  approved: 'bg-green-100 text-green-700',
+  edited: 'bg-blue-100 text-blue-700',
+  rejected: 'bg-red-100 text-red-500',
+  sent: 'bg-gray-100 text-gray-500',
+}
+const DRAFT_BORDER = {
+  pending_review: 'border-l-amber-400',
+  approved: 'border-l-green-400',
+  edited: 'border-l-green-400',
+  rejected: 'border-l-red-300',
+  sent: 'border-l-gray-300',
+}
+
+export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticUpdate }) {
   const [saving, setSaving] = useState(false)
   const [activity, setActivity] = useState([])
   const [note, setNote] = useState('')
+  const [drafts, setDrafts] = useState([])
+  const [emails, setEmails] = useState([])
+  const [drafting, setDrafting] = useState(null)
+  const [generatingBatchId, setGeneratingBatchId] = useState(null)
+  const [loadingDrafts, setLoadingDrafts] = useState(false)
+  const [loadingEmails, setLoadingEmails] = useState(false)
+  const [calls, setCalls] = useState([])
+  const [loggingCall, setLoggingCall] = useState(false)
 
   useEffect(() => {
-    if (city) {
-      setEditing({})
-      getActivity(city.id).then(setActivity).catch(() => {})
-    }
+    if (!city) return
+    setNote('')
+    setDrafting(null)
+    setGeneratingBatchId(null)
+    setDrafts([])
+    setEmails([])
+    setCalls([])
+    setLoggingCall(false)
+    setLoadingDrafts(true)
+    setLoadingEmails(true)
+    getActivity(city.id).then(setActivity).catch(() => {})
+    getCityDrafts(city.id).then(setDrafts).catch(() => {}).finally(() => setLoadingDrafts(false))
+    getCityEmails(city.id).then(setEmails).catch(() => {}).finally(() => setLoadingEmails(false))
+    getCityCalls(city.id).then(setCalls).catch(() => {})
   }, [city?.id])
+
+  // Poll for new draft after clicking generate
+  useEffect(() => {
+    if (!generatingBatchId || !city) return
+    const interval = setInterval(() => {
+      getCityDrafts(city.id).then(data => {
+        setDrafts(data)
+        if (data.some(d => d.batch_id === generatingBatchId)) {
+          setGeneratingBatchId(null)
+          setDrafting(null)
+          clearInterval(interval)
+        }
+      }).catch(() => {})
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [generatingBatchId, city?.id])
 
   if (!city) return null
 
@@ -21,6 +72,7 @@ export default function CityDetailPanel({ city, onClose, onUpdate }) {
 
   const save = async (fields) => {
     setSaving(true)
+    onOptimisticUpdate?.(city.id, fields)
     try {
       const updated = await updateCity(city.id, fields)
       onUpdate(updated)
@@ -31,8 +83,51 @@ export default function CityDetailPanel({ city, onClose, onUpdate }) {
 
   const saveNote = async () => {
     if (!note.trim()) return
-    await save({ notes: city.notes ? `${city.notes}\n\n${new Date().toLocaleDateString()}: ${note}` : `${new Date().toLocaleDateString()}: ${note}` })
+    const updated = city.notes
+      ? `${city.notes}\n\n${new Date().toLocaleDateString()}: ${note}`
+      : `${new Date().toLocaleDateString()}: ${note}`
+    await save({ notes: updated })
     setNote('')
+  }
+
+  const handleDraft = async (draftType) => {
+    setDrafting(draftType)
+    try {
+      const result = await generateDrafts([city.id], draftType)
+      setGeneratingBatchId(result.batch_id)
+    } catch {
+      setDrafting(null)
+    }
+  }
+
+  const patchDraft = (id, fields) => {
+    setDrafts(prev => prev.map(d => d.id === id ? { ...d, ...fields } : d))
+    updateDraft(id, fields).then(updated =>
+      setDrafts(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d))
+    )
+  }
+
+  const handleLogCall = async ({ notes, outcome, contact_type, called_at }) => {
+    const optimistic = { id: `tmp-${Date.now()}`, city_id: city.id, notes, outcome, contact_type, called_at: called_at || new Date().toISOString() }
+    setCalls(prev => [optimistic, ...prev])
+    setLoggingCall(false)
+    const saved = await createCallLog(city.id, { notes, outcome, contact_type, called_at: called_at || undefined })
+    setCalls(prev => prev.map(c => c.id === optimistic.id ? saved : c))
+  }
+
+  const handleDeleteCall = (callId) => {
+    setCalls(prev => prev.filter(c => c.id !== callId))
+    deleteCallLog(city.id, callId).catch(() => {
+      getCityCalls(city.id).then(setCalls)
+    })
+  }
+
+  const handleRegenerate = async (id) => {
+    const draft = drafts.find(d => d.id === id)
+    setDrafts(prev => prev.map(d => d.id === id ? { ...d, status: 'rejected' } : d))
+    const { batch_id } = await regenerateDraft(id)
+    setGeneratingBatchId(batch_id)
+    setDrafting(draft?.draft_type || 'endorsement_outreach')
   }
 
   const flags = [
@@ -42,6 +137,9 @@ export default function CityDetailPanel({ city, onClose, onUpdate }) {
     city.mayor_needs_verification && { label: 'Mayor Unverified', color: 'bg-red-100 text-red-600' },
     city.wildfire_risk_tier === 'high' && { label: 'High Wildfire Risk', color: 'bg-red-100 text-red-600' },
   ].filter(Boolean)
+
+  const activeDrafts = drafts.filter(d => d.status !== 'rejected' && d.status !== 'sent')
+  const archivedDrafts = drafts.filter(d => d.status === 'rejected' || d.status === 'sent')
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
@@ -64,7 +162,6 @@ export default function CityDetailPanel({ city, onClose, onUpdate }) {
             </div>
           </div>
 
-          {/* Insurance flags */}
           {flags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {flags.map(f => (
@@ -84,16 +181,83 @@ export default function CityDetailPanel({ city, onClose, onUpdate }) {
                 <option key={s.key} value={s.key}>{s.label}</option>
               ))}
             </select>
-            <button className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 whitespace-nowrap">
+            <button
+              disabled={!!drafting}
+              onClick={() => handleDraft('endorsement_outreach')}
+              className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 whitespace-nowrap disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {drafting === 'endorsement_outreach' && <Spinner />}
               Draft outreach
             </button>
-            <button className="bg-amber-500 text-white text-xs px-3 py-1.5 rounded hover:bg-amber-600 whitespace-nowrap">
+            <button
+              disabled={!!drafting}
+              onClick={() => handleDraft('info_request')}
+              className="bg-amber-500 text-white text-xs px-3 py-1.5 rounded hover:bg-amber-600 whitespace-nowrap disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {drafting === 'info_request' && <Spinner />}
               Info request
             </button>
           </div>
         </div>
 
         <div className="flex-1 px-5 py-4 space-y-5">
+
+          {/* Drafts */}
+          {(drafts.length > 0 || drafting || loadingDrafts) && (
+            <section>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+                Drafts
+                {activeDrafts.length > 0 && (
+                  <span className="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full font-medium">
+                    {activeDrafts.length}
+                  </span>
+                )}
+              </h3>
+
+              <div className="space-y-2">
+                {/* Initial load skeleton */}
+                {loadingDrafts && !generatingBatchId && (
+                  <SkeletonSection lines={2} />
+                )}
+
+                {/* Generating placeholder */}
+                {generatingBatchId && (
+                  <div className="border-l-2 border-l-gray-300 bg-gray-50 rounded-r px-3 py-2.5 flex items-center gap-2 text-xs text-gray-500">
+                    <Spinner />
+                    Generating {DRAFT_TYPE_LABEL[drafting] || 'draft'}...
+                  </div>
+                )}
+
+                {activeDrafts.map(draft => (
+                  <PanelDraftCard
+                    key={draft.id}
+                    draft={draft}
+                    onPatch={patchDraft}
+                    onRegenerate={handleRegenerate}
+                  />
+                ))}
+
+                {archivedDrafts.length > 0 && (
+                  <details className="group">
+                    <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">
+                      {archivedDrafts.length} archived (rejected/sent)
+                    </summary>
+                    <div className="space-y-2 mt-2">
+                      {archivedDrafts.map(draft => (
+                        <PanelDraftCard
+                          key={draft.id}
+                          draft={draft}
+                          onPatch={patchDraft}
+                          onRegenerate={handleRegenerate}
+                        />
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            </section>
+          )}
+
           {/* Insurance data */}
           <section>
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Insurance Data</h3>
@@ -106,9 +270,7 @@ export default function CityDetailPanel({ city, onClose, onUpdate }) {
               </div>
               <div className="bg-gray-50 rounded p-2.5">
                 <div className="text-lg font-semibold text-gray-900">
-                  {city.fair_plan_exposure
-                    ? `$${(city.fair_plan_exposure / 1e6).toFixed(0)}M`
-                    : '—'}
+                  {city.fair_plan_exposure ? `$${(city.fair_plan_exposure / 1e6).toFixed(0)}M` : '—'}
                 </div>
                 <div className="text-xs text-gray-500">Exposure</div>
               </div>
@@ -150,6 +312,59 @@ export default function CityDetailPanel({ city, onClose, onUpdate }) {
                 )}
               </div>
             </div>
+          </section>
+
+          {/* Timeline: emails + calls */}
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
+                Timeline
+                {(emails.length + calls.length) > 0 && (
+                  <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded-full font-medium">
+                    {emails.length + calls.length}
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={() => setLoggingCall(l => !l)}
+                className="text-xs text-gray-600 border border-gray-200 bg-white px-2.5 py-1 rounded hover:bg-gray-50"
+              >
+                Log call
+              </button>
+            </div>
+
+            {loggingCall && (
+              <LogCallForm
+                city={city}
+                onSave={handleLogCall}
+                onCancel={() => setLoggingCall(false)}
+              />
+            )}
+
+            {loadingEmails ? (
+              <SkeletonSection lines={3} />
+            ) : (emails.length + calls.length) === 0 ? (
+              <div className="bg-gray-50 rounded p-4 text-center">
+                <p className="text-xs text-gray-400">No emails or calls logged yet.</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Connect Gmail to sync emails, or log a call above.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {[
+                  ...emails.map(e => ({ ...e, _type: 'email', _date: new Date(e.sent_at || e.created_at) })),
+                  ...calls.map(c => ({ ...c, _type: 'call', _date: new Date(c.called_at || c.created_at) })),
+                ]
+                  .sort((a, b) => b._date - a._date)
+                  .map(item =>
+                    item._type === 'email'
+                      ? <EmailRow key={`e-${item.id}`} email={item} />
+                      : <CallRow key={`c-${item.id}`} call={item} onDelete={handleDeleteCall} />
+                  )
+                }
+              </div>
+            )}
           </section>
 
           {/* Officials */}
@@ -257,6 +472,301 @@ export default function CityDetailPanel({ city, onClose, onUpdate }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function PanelDraftCard({ draft, onPatch, onRegenerate }) {
+  const [expanded, setExpanded] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [body, setBody] = useState(draft.body || '')
+  const [subject, setSubject] = useState(draft.subject || '')
+  const [saving, setSaving] = useState(false)
+
+  const borderColor = DRAFT_BORDER[draft.status] || 'border-l-gray-200'
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      onPatch(draft.id, { body, subject, status: 'edited' })
+      setEditMode(false)
+      setExpanded(true)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={`border-l-2 ${borderColor} bg-gray-50 rounded-r overflow-hidden`}>
+      {/* Card header */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${DRAFT_TYPE_COLOR[draft.draft_type] || 'bg-gray-100 text-gray-500'}`}>
+          {DRAFT_TYPE_LABEL[draft.draft_type] || draft.draft_type}
+        </span>
+        <span className={`text-xs px-1.5 py-0.5 rounded ${DRAFT_STATUS_COLOR[draft.status] || 'bg-gray-100 text-gray-500'}`}>
+          {draft.status.replace('_', ' ')}
+        </span>
+        <span className="text-xs text-gray-400 ml-auto shrink-0">
+          {draft.created_at ? new Date(draft.created_at).toLocaleDateString() : ''}
+        </span>
+      </div>
+
+      {/* Subject */}
+      <div className="px-3 pb-2">
+        {editMode ? (
+          <input
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            className="w-full text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 mb-1"
+          />
+        ) : (
+          <p className="text-xs text-gray-600 font-medium truncate">{draft.subject}</p>
+        )}
+        <p className="text-xs text-gray-400 truncate">To: {draft.to_address || '—'}</p>
+      </div>
+
+      {/* Body (collapsible) */}
+      {editMode ? (
+        <div className="px-3 pb-2">
+          <textarea
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            rows={8}
+            className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono"
+          />
+        </div>
+      ) : (
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="text-xs text-blue-500 hover:underline mb-1"
+          >
+            {expanded ? 'Hide body' : 'Show body'}
+          </button>
+          {expanded && (
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed bg-white border border-gray-100 rounded p-2 max-h-48 overflow-y-auto">
+              {draft.body}
+            </pre>
+          )}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-1.5 flex-wrap px-3 pb-2.5">
+        {draft.status !== 'approved' && draft.status !== 'edited' && draft.status !== 'rejected' && (
+          <button
+            onClick={() => onPatch(draft.id, { status: 'approved' })}
+            className="bg-green-600 text-white text-xs px-2.5 py-1 rounded hover:bg-green-700"
+          >
+            Approve
+          </button>
+        )}
+        {draft.status !== 'rejected' && (
+          <button
+            onClick={() => onPatch(draft.id, { status: 'rejected' })}
+            className="text-red-500 border border-red-200 text-xs px-2.5 py-1 rounded hover:bg-red-50"
+          >
+            Reject
+          </button>
+        )}
+        {draft.status === 'rejected' && (
+          <button
+            onClick={() => onPatch(draft.id, { status: 'pending_review' })}
+            className="text-gray-500 border border-gray-200 text-xs px-2.5 py-1 rounded hover:bg-gray-100"
+          >
+            Restore
+          </button>
+        )}
+        <button
+          onClick={() => onRegenerate(draft.id)}
+          className="text-purple-600 border border-purple-200 text-xs px-2.5 py-1 rounded hover:bg-purple-50"
+        >
+          Regenerate
+        </button>
+        {editMode ? (
+          <>
+            <button
+              onClick={() => setEditMode(false)}
+              className="text-gray-500 border border-gray-200 text-xs px-2.5 py-1 rounded hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="bg-gray-800 text-white text-xs px-2.5 py-1 rounded hover:bg-gray-700 disabled:opacity-40"
+            >
+              Save
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => { setEditMode(true); setExpanded(false); setBody(draft.body || ''); setSubject(draft.subject || '') }}
+            className="text-gray-600 border border-gray-200 text-xs px-2.5 py-1 rounded hover:bg-gray-100"
+          >
+            Edit
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function LogCallForm({ city, onSave, onCancel }) {
+  const [notes, setNotes] = useState('')
+  const [outcome, setOutcome] = useState('reached')
+  const [contactType, setContactType] = useState('mayor')
+  const [calledAt, setCalledAt] = useState(() => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+    return now.toISOString().slice(0, 16)
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSave({ notes: notes.trim() || null, outcome, contact_type: contactType, called_at: new Date(calledAt).toISOString() })
+  }
+
+  const mayorPhone = city.mayor_phone
+  const cityPhone = city.city_phone
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-lg p-3 mb-3 space-y-2">
+      <div className="flex gap-2 flex-wrap">
+        <select
+          value={contactType}
+          onChange={e => setContactType(e.target.value)}
+          className="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white"
+        >
+          <option value="mayor">Mayor direct{mayorPhone ? ` · ${mayorPhone}` : ''}</option>
+          <option value="city">City line{cityPhone ? ` · ${cityPhone}` : ''}</option>
+        </select>
+        <select
+          value={outcome}
+          onChange={e => setOutcome(e.target.value)}
+          className="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white"
+        >
+          <option value="reached">Reached</option>
+          <option value="voicemail">Voicemail</option>
+          <option value="no_answer">No answer</option>
+        </select>
+        <input
+          type="datetime-local"
+          value={calledAt}
+          onChange={e => setCalledAt(e.target.value)}
+          className="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white flex-1 min-w-0"
+        />
+      </div>
+      <textarea
+        value={notes}
+        onChange={e => setNotes(e.target.value)}
+        placeholder="Notes from the call..."
+        rows={3}
+        className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-300 resize-none"
+      />
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel}
+          className="text-xs text-gray-500 border border-gray-200 rounded px-3 py-1.5 hover:bg-gray-50">
+          Cancel
+        </button>
+        <button type="submit"
+          className="text-xs bg-gray-900 text-white rounded px-3 py-1.5 hover:bg-gray-700">
+          Save call
+        </button>
+      </div>
+    </form>
+  )
+}
+
+const OUTCOME_LABEL = { reached: 'Reached', voicemail: 'Voicemail', no_answer: 'No answer' }
+const OUTCOME_COLOR = {
+  reached: 'bg-blue-50 text-blue-700',
+  voicemail: 'bg-amber-50 text-amber-700',
+  no_answer: 'bg-gray-100 text-gray-500',
+}
+const CONTACT_LABEL = { mayor: 'Mayor direct', city: 'City line' }
+
+function CallRow({ call, onDelete }) {
+  const [expanded, setExpanded] = useState(false)
+  const outcomeLabel = OUTCOME_LABEL[call.outcome] || call.outcome || 'Call'
+  const outcomeColor = OUTCOME_COLOR[call.outcome] || 'bg-gray-100 text-gray-500'
+  const contactLabel = call.contact_type ? CONTACT_LABEL[call.contact_type] : null
+
+  return (
+    <div className="rounded border border-gray-200 bg-white text-xs">
+      <div className="px-3 py-2 flex items-start gap-2">
+        <button
+          onClick={() => call.notes && setExpanded(e => !e)}
+          className={`flex-1 min-w-0 text-left flex items-start gap-2 ${call.notes ? 'cursor-pointer' : 'cursor-default'}`}
+        >
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-gray-500 font-medium">Call</span>
+              <span className={`px-1.5 py-0.5 rounded ${outcomeColor}`}>{outcomeLabel}</span>
+              {contactLabel && <span className="text-gray-400">{contactLabel}</span>}
+              {call.notes && !expanded && (
+                <span className="text-gray-400 truncate max-w-[160px]">{call.notes}</span>
+              )}
+            </div>
+          </div>
+          <span className="text-gray-400 shrink-0 ml-2">
+            {call.called_at ? new Date(call.called_at).toLocaleDateString() : ''}
+          </span>
+        </button>
+        <button
+          onClick={() => onDelete(call.id)}
+          className="text-gray-300 hover:text-red-400 shrink-0 ml-1 leading-none"
+          title="Remove"
+        >
+          &times;
+        </button>
+      </div>
+      {expanded && call.notes && (
+        <div className="px-3 pb-3 border-t border-gray-100 pt-2 text-gray-700 whitespace-pre-wrap">
+          {call.notes}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EmailRow({ email }) {
+  const [expanded, setExpanded] = useState(false)
+  const isInbound = email.direction === 'inbound'
+
+  return (
+    <div className={`rounded border text-xs ${isInbound ? 'border-green-200 bg-green-50' : 'border-blue-100 bg-blue-50'}`}>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full text-left px-3 py-2 flex items-start gap-2"
+      >
+        <span className={`shrink-0 mt-0.5 font-bold ${isInbound ? 'text-green-600' : 'text-blue-500'}`}>
+          {isInbound ? '←' : '→'}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-gray-800 truncate">{email.subject || '(no subject)'}</p>
+          <p className="text-gray-500 truncate">
+            {isInbound ? email.from_address : `To: ${email.to_address}`}
+          </p>
+        </div>
+        <span className="text-gray-400 shrink-0 ml-2">
+          {email.sent_at ? new Date(email.sent_at).toLocaleDateString() : ''}
+        </span>
+      </button>
+      {expanded && email.body_preview && (
+        <div className="px-3 pb-3 border-t border-gray-200 mt-1 pt-2 text-gray-700 whitespace-pre-wrap">
+          {email.body_preview}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Spinner() {
+  return (
+    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+    </svg>
   )
 }
 
