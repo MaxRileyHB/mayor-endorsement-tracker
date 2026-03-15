@@ -1,4 +1,5 @@
 import base64
+import html as _html
 import re
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -28,16 +29,34 @@ class SendRequest(BaseModel):
     batch_id: Optional[str] = None
 
 
+def _plain_to_html(text: str) -> str:
+    """Convert plain text body to simple HTML so Gmail doesn't word-wrap it."""
+    escaped = _html.escape(text)
+    # Split on blank lines → paragraphs; single newlines (e.g. signature) → <br>
+    paragraphs = escaped.split('\n\n')
+    html_parts = []
+    for para in paragraphs:
+        inner = para.strip().replace('\n', '<br>')
+        html_parts.append(f'<p style="margin:0 0 1em 0;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;">{inner}</p>')
+    return (
+        '<html><body style="margin:0;padding:0;">'
+        + ''.join(html_parts)
+        + '</body></html>'
+    )
+
+
 def _build_message(to: str, subject: str, body: str, from_email: str) -> dict:
     body = body.replace('\r\n', '\n').replace('\r', '\n')
-    # EmailMessage with cte='base64' encodes the body as an opaque base64 blob —
-    # no content line-wrapping possible. It also RFC-2047-encodes non-ASCII header
-    # values (e.g. em dashes in subject lines) automatically.
+    html_body = _plain_to_html(body)
+
     msg = EmailMessage(policy=email.policy.SMTP)
     msg['From'] = f"{FROM_NAME} <{from_email}>"
     msg['To'] = to
     msg['Subject'] = subject
-    msg.set_content(body, charset='utf-8', cte='base64')
+    # Plain text fallback + HTML primary (multipart/alternative)
+    msg.set_content(body, charset='utf-8')
+    msg.add_alternative(html_body, subtype='html', charset='utf-8')
+
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
     return {"raw": raw}
 
