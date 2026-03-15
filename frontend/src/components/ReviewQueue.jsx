@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getDrafts, updateDraft, getBatchStatus, regenerateDraft } from '../api'
+import { getDrafts, updateDraft, getBatchStatus, regenerateDraft, sendDrafts } from '../api'
 import { TIER_COLORS } from '../constants'
 import { SkeletonDraftCard } from './Skeleton'
 
@@ -266,7 +266,21 @@ export default function ReviewQueue({ batchId, expectedCount, onBack }) {
           <button
             disabled={sending}
             className="ml-auto bg-green-500 hover:bg-green-400 disabled:opacity-50 text-sm font-medium px-4 py-1.5 rounded"
-            onClick={() => alert(`Gmail integration coming soon — ${approvedCount} drafts ready.`)}
+            onClick={async () => {
+              setSending(true)
+              try {
+                const ids = drafts.filter(d => d.status === 'approved' || d.status === 'edited').map(d => d.id)
+                const result = await sendDrafts(ids)
+                await load()
+                if (result.failed?.length) {
+                  alert(`Sent ${result.sent}. ${result.failed.length} failed — check that Gmail is connected.`)
+                }
+              } catch (e) {
+                alert('Send failed — make sure Gmail is connected.')
+              } finally {
+                setSending(false)
+              }
+            }}
           >
             Send {approvedCount} approved
           </button>

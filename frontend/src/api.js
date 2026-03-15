@@ -31,3 +31,7 @@ export const getDrafts = (params) => api.get('/drafts', { params }).then(r => r.
 export const updateDraft = (id, data) => api.patch(`/drafts/${id}`, data).then(r => r.data)
 export const getBatchStatus = (batch_id) => api.get(`/drafts/batch/${batch_id}/status`).then(r => r.data)
 export const regenerateDraft = (id) => api.post(`/drafts/${id}/regenerate`).then(r => r.data)
+
+export const getAuthStatus = () => api.get('/auth/status').then(r => r.data)
+export const sendDrafts = (draft_ids) => api.post('/drafts/send', { draft_ids }).then(r => r.data)
+export const syncEmails = () => api.post('/emails/sync').then(r => r.data)

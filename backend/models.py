@@ -98,6 +98,14 @@ class Draft(Base):
     sent_at = Column(DateTime)
 
 
+class Settings(Base):
+    __tablename__ = "settings"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(Text)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 class CallLog(Base):
     __tablename__ = "call_logs"
 

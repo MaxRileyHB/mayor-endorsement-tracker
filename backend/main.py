@@ -5,7 +5,7 @@ import models
 
 models.Base.metadata.create_all(bind=engine)
 
-from routers import cities, drafts
+from routers import cities, drafts, auth, emails
 
 app = FastAPI(title="Mayor CRM API")
 
@@ -18,6 +18,8 @@ app.add_middleware(
 
 app.include_router(cities.router)
 app.include_router(drafts.router)
+app.include_router(auth.router)
+app.include_router(emails.router)
 
 
 @app.get("/health")

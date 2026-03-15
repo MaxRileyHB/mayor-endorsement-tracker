@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getCities, getStats, batchUpdate, generateDrafts, getFilterOptions } from './api'
+import { getCities, getStats, batchUpdate, generateDrafts, getFilterOptions, getAuthStatus, syncEmails } from './api'
 import KanbanBoard from './components/KanbanBoard'
 import TableView from './components/TableView'
 import CityDetailPanel from './components/CityDetailPanel'
@@ -62,6 +62,8 @@ export default function App() {
   const [reviewBatchId, setReviewBatchId] = useState(null)
   const [reviewCityCount, setReviewCityCount] = useState(0)
   const [generating, setGenerating] = useState(false)
+  const [gmailStatus, setGmailStatus] = useState(null)
+  const [syncing, setSyncing] = useState(false)
 
   const loadCities = useCallback(async () => {
     setFetching(true)
@@ -86,7 +88,19 @@ export default function App() {
 
   useEffect(() => {
     getFilterOptions().then(setFilterOptions).catch(() => {})
+    getAuthStatus().then(setGmailStatus).catch(() => {})
   }, [])
+
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      await syncEmails()
+      await loadCities()
+      getAuthStatus().then(setGmailStatus)
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput), 350)
@@ -205,6 +219,25 @@ export default function App() {
             </span>
           )}
         </button>
+
+        {/* Gmail status */}
+        {gmailStatus?.connected ? (
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="text-sm text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {syncing ? <Spinner /> : <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />}
+            {syncing ? 'Syncing...' : 'Sync Gmail'}
+          </button>
+        ) : (
+          <a
+            href={`${import.meta.env.VITE_API_BASE_URL || ''}/api/auth/gmail`}
+            className="text-sm text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50"
+          >
+            Connect Gmail
+          </a>
+        )}
 
         <div className="flex border border-gray-200 rounded-lg overflow-hidden text-sm">
           <button
