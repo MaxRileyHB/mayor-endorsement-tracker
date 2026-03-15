@@ -1,6 +1,8 @@
 import base64
 import re
 from datetime import datetime, timezone
+from email.message import EmailMessage
+import email.policy
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -27,21 +29,16 @@ class SendRequest(BaseModel):
 
 
 def _build_message(to: str, subject: str, body: str, from_email: str) -> dict:
-    # Normalize line endings
     body = body.replace('\r\n', '\n').replace('\r', '\n')
-    # Build RFC 2822 message manually with 8bit encoding so the body is sent
-    # verbatim — avoids quoted-printable's 76-char line wrapping.
-    raw_message = '\r\n'.join([
-        f"From: {FROM_NAME} <{from_email}>",
-        f"To: {to}",
-        f"Subject: {subject}",
-        "MIME-Version: 1.0",
-        "Content-Type: text/plain; charset=utf-8",
-        "Content-Transfer-Encoding: 8bit",
-        "",
-        body,
-    ])
-    raw = base64.urlsafe_b64encode(raw_message.encode("utf-8")).decode()
+    # EmailMessage with cte='base64' encodes the body as an opaque base64 blob —
+    # no content line-wrapping possible. It also RFC-2047-encodes non-ASCII header
+    # values (e.g. em dashes in subject lines) automatically.
+    msg = EmailMessage(policy=email.policy.SMTP)
+    msg['From'] = f"{FROM_NAME} <{from_email}>"
+    msg['To'] = to
+    msg['Subject'] = subject
+    msg.set_content(body, charset='utf-8', cte='base64')
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
     return {"raw": raw}
 
 
