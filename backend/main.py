@@ -7,11 +7,14 @@ import models
 models.Base.metadata.create_all(bind=engine)
 
 # Idempotent migrations for columns added after initial deploy
-with engine.connect() as _conn:
-    _conn.execute(text(
-        "ALTER TABLE emails ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT TRUE"
-    ))
-    _conn.commit()
+try:
+    with engine.connect() as _conn:
+        _conn.execute(text(
+            "ALTER TABLE emails ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT TRUE"
+        ))
+        _conn.commit()
+except Exception as _e:
+    print(f"Migration warning (non-fatal): {_e}")
 
 from routers import cities, drafts, auth, emails
 

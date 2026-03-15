@@ -164,6 +164,17 @@ def sync_emails(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gmail list error: {str(e)}")
 
+    # Get our email address once before the loop
+    try:
+        profile = service.users().getProfile(userId="me").execute()
+        our_email = profile["emailAddress"].lower()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gmail profile error: {str(e)}")
+
+    def extract_email(s):
+        m = re.search(r'[\w.+-]+@[\w.-]+\.\w+', s)
+        return m.group(0).lower() if m else s.lower()
+
     synced = matched = unmatched = 0
 
     for msg_ref in messages:
@@ -188,11 +199,6 @@ def sync_emails(db: Session = Depends(get_db)):
         subject = headers.get("subject", "")
         date_str = headers.get("date", "")
 
-        # Extract plain email from "Name <email>" format
-        def extract_email(s):
-            m = re.search(r'[\w.+-]+@[\w.-]+\.\w+', s)
-            return m.group(0).lower() if m else s.lower()
-
         from_email = extract_email(from_addr)
         to_email = extract_email(to_addr)
 
@@ -204,9 +210,7 @@ def sync_emails(db: Session = Depends(get_db)):
         except Exception:
             sent_at = datetime.now(timezone.utc)
 
-        # Detect direction: if we sent it, it's outbound
-        profile = service.users().getProfile(userId="me").execute()
-        our_email = profile["emailAddress"].lower()
+        # Detect direction
         direction = "outbound" if from_email == our_email else "inbound"
 
         # Extract body (full, no truncation)
