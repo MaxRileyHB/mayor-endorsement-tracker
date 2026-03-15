@@ -103,13 +103,6 @@ def generate_draft_for_city(city: City, draft_type: str, batch_id: str, db: Sess
         body = _re.sub(r'^Subject:[^\n]*\n\n?', '', body, flags=_re.IGNORECASE).strip()
         # Normalize line endings
         body = body.replace('\r\n', '\n').replace('\r', '\n')
-        # Remove soft line-wrapping within paragraphs (AI wraps at ~72 chars).
-        # Split on blank lines (paragraph breaks), rejoin within-paragraph newlines.
-        paragraphs = _re.split(r'\n{2,}', body)
-        body = '\n\n'.join(
-            ' '.join(line.strip() for line in para.splitlines() if line.strip())
-            for para in paragraphs
-        )
     except Exception as e:
         body = f"[Generation failed: {e}]"
 

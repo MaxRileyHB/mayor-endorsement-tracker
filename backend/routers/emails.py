@@ -1,8 +1,6 @@
 import base64
 import re
 from datetime import datetime, timezone
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -29,14 +27,21 @@ class SendRequest(BaseModel):
 
 
 def _build_message(to: str, subject: str, body: str, from_email: str) -> dict:
-    # Normalize line endings so the email renders cleanly
+    # Normalize line endings
     body = body.replace('\r\n', '\n').replace('\r', '\n')
-    message = MIMEMultipart("alternative")
-    message["To"] = to
-    message["From"] = f"{FROM_NAME} <{from_email}>"
-    message["Subject"] = subject
-    message.attach(MIMEText(body, "plain", "utf-8"))
-    raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    # Build RFC 2822 message manually with 8bit encoding so the body is sent
+    # verbatim — avoids quoted-printable's 76-char line wrapping.
+    raw_message = '\r\n'.join([
+        f"From: {FROM_NAME} <{from_email}>",
+        f"To: {to}",
+        f"Subject: {subject}",
+        "MIME-Version: 1.0",
+        "Content-Type: text/plain; charset=utf-8",
+        "Content-Transfer-Encoding: 8bit",
+        "",
+        body,
+    ])
+    raw = base64.urlsafe_b64encode(raw_message.encode("utf-8")).decode()
     return {"raw": raw}
 
 
