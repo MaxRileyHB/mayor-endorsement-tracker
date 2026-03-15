@@ -8,7 +8,7 @@ import sys
 sys.path.append("..")
 from database import get_db
 from models import City, ActivityLog, Email, CallLog
-from schemas import CityRead, CityUpdate, BatchUpdate, StatsResponse, EmailRead, CallLogRead, CallLogCreate
+from schemas import CityRead, CityUpdate, CityBase, BatchUpdate, StatsResponse, EmailRead, CallLogRead, CallLogCreate
 
 router = APIRouter(prefix="/api/cities", tags=["cities"])
 
@@ -121,6 +121,15 @@ def list_cities(
     q = q.order_by(col.asc() if sort_order == "asc" else col.desc())
 
     return q.offset((page - 1) * per_page).limit(per_page).all()
+
+
+@router.post("", response_model=CityRead, status_code=201)
+def create_city(data: CityBase, db: Session = Depends(get_db)):
+    city = City(**data.model_dump())
+    db.add(city)
+    db.commit()
+    db.refresh(city)
+    return city
 
 
 @router.get("/{city_id}", response_model=CityRead)
