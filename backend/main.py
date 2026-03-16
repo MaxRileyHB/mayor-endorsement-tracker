@@ -12,6 +12,8 @@ try:
         _conn.execute(text(
             "ALTER TABLE emails ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT TRUE"
         ))
+        _conn.execute(text("ALTER TABLE emails ALTER COLUMN from_address TYPE TEXT"))
+        _conn.execute(text("ALTER TABLE emails ALTER COLUMN to_address TYPE TEXT"))
         _conn.commit()
 except Exception as _e:
     print(f"Migration warning (non-fatal): {_e}")

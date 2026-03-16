@@ -70,8 +70,8 @@ class Email(Base):
     gmail_message_id = Column(String(255))
     gmail_thread_id = Column(String(255))
     direction = Column(String(10))  # inbound / outbound
-    from_address = Column(String(255))
-    to_address = Column(String(255))
+    from_address = Column(Text)
+    to_address = Column(Text)
     subject = Column(Text)
     body_preview = Column(Text)
     sent_at = Column(DateTime)
