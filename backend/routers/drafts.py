@@ -71,7 +71,7 @@ def generate_draft_for_city(city: City, draft_type: str, batch_id: str, db: Sess
         subject = f"Request for Mayor's Contact Information — Ben Allen for Insurance Commissioner"
 
     else:  # endorsement_outreach
-        to_address = city.mayor_email or city.city_email or ""
+        to_address = city.mayor_work_email or city.mayor_personal_email or city.mayor_email or city.city_email or ""
         context_parts = [
             f"City: {city.city_name}, {city.county} County",
             f"Population: {city.population:,}" if city.population else "",

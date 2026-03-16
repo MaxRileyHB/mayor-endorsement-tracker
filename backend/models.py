@@ -31,9 +31,15 @@ class City(Base):
     office_hours = Column(String(255))
 
     # Mayor direct contact (populated later)
-    mayor_email = Column(String(255))
-    mayor_phone = Column(String(50))
+    mayor_email = Column(String(255))       # legacy — superseded by work/personal fields below
+    mayor_phone = Column(String(50))        # legacy — superseded by work/personal fields below
     mayor_contact_source = Column(String(255))
+    mayor_work_email = Column(String(255))
+    mayor_work_phone = Column(String(50))
+    mayor_personal_email = Column(String(255))
+    mayor_personal_phone = Column(String(50))
+    mayor_instagram = Column(String(255))
+    mayor_facebook = Column(String(255))
 
     # Political
     congressional_district = Column(Text)

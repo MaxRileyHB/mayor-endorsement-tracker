@@ -14,6 +14,26 @@ try:
         ))
         _conn.execute(text("ALTER TABLE emails ALTER COLUMN from_address TYPE TEXT"))
         _conn.execute(text("ALTER TABLE emails ALTER COLUMN to_address TYPE TEXT"))
+        # Mayor expanded contact fields
+        _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS mayor_work_email VARCHAR(255)"))
+        _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS mayor_work_phone VARCHAR(50)"))
+        _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS mayor_personal_email VARCHAR(255)"))
+        _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS mayor_personal_phone VARCHAR(50)"))
+        _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS mayor_instagram VARCHAR(255)"))
+        _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS mayor_facebook VARCHAR(255)"))
+        # Migrate legacy mayor_email / mayor_phone into the new work fields (only where new fields are blank)
+        _conn.execute(text("""
+            UPDATE cities
+            SET mayor_work_email = mayor_email
+            WHERE mayor_email IS NOT NULL AND mayor_email != ''
+              AND (mayor_work_email IS NULL OR mayor_work_email = '')
+        """))
+        _conn.execute(text("""
+            UPDATE cities
+            SET mayor_work_phone = mayor_phone
+            WHERE mayor_phone IS NOT NULL AND mayor_phone != ''
+              AND (mayor_work_phone IS NULL OR mayor_work_phone = '')
+        """))
         _conn.commit()
 except Exception as _e:
     print(f"Migration warning (non-fatal): {_e}")

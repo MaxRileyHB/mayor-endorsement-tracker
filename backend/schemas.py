@@ -24,6 +24,12 @@ class CityBase(BaseModel):
     mayor_email: Optional[str] = None
     mayor_phone: Optional[str] = None
     mayor_contact_source: Optional[str] = None
+    mayor_work_email: Optional[str] = None
+    mayor_work_phone: Optional[str] = None
+    mayor_personal_email: Optional[str] = None
+    mayor_personal_phone: Optional[str] = None
+    mayor_instagram: Optional[str] = None
+    mayor_facebook: Optional[str] = None
     congressional_district: Optional[str] = None
     state_senate_district: Optional[str] = None
     state_assembly_district: Optional[str] = None
@@ -61,6 +67,12 @@ class CityUpdate(BaseModel):
     mayor_email: Optional[str] = None
     mayor_phone: Optional[str] = None
     mayor_contact_source: Optional[str] = None
+    mayor_work_email: Optional[str] = None
+    mayor_work_phone: Optional[str] = None
+    mayor_personal_email: Optional[str] = None
+    mayor_personal_phone: Optional[str] = None
+    mayor_instagram: Optional[str] = None
+    mayor_facebook: Optional[str] = None
     city_email: Optional[str] = None
     city_phone: Optional[str] = None
     city_website: Optional[str] = None

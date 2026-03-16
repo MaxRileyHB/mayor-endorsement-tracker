@@ -338,12 +338,20 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
                 <ContactField label="Clerk" value={city.city_clerk} />
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1 font-medium">Mayor Direct</p>
-                <ContactField label="Email" value={city.mayor_email} editable
-                  onSave={v => save({ mayor_email: v })} />
-                <ContactField label="Phone" value={city.mayor_phone} editable
-                  onSave={v => save({ mayor_phone: v })} />
-                {!city.mayor_email && !city.mayor_phone && (
+                <p className="text-xs text-gray-500 mb-1 font-medium">Mayor</p>
+                <ContactField label="Work Email" value={city.mayor_work_email} editable
+                  onSave={v => save({ mayor_work_email: v })} />
+                <ContactField label="Work Phone" value={city.mayor_work_phone} editable
+                  onSave={v => save({ mayor_work_phone: v })} />
+                <ContactField label="Personal Email" value={city.mayor_personal_email} editable
+                  onSave={v => save({ mayor_personal_email: v })} />
+                <ContactField label="Personal Phone" value={city.mayor_personal_phone} editable
+                  onSave={v => save({ mayor_personal_phone: v })} />
+                <ContactField label="Instagram" value={city.mayor_instagram} editable
+                  onSave={v => save({ mayor_instagram: v })} />
+                <ContactField label="Facebook" value={city.mayor_facebook} editable
+                  onSave={v => save({ mayor_facebook: v })} />
+                {!city.mayor_work_email && !city.mayor_work_phone && !city.mayor_personal_email && !city.mayor_personal_phone && !city.mayor_instagram && !city.mayor_facebook && (
                   <p className="text-xs text-gray-400 italic">Not yet collected</p>
                 )}
               </div>
@@ -650,7 +658,7 @@ function PanelDraftCard({ draft, onPatch, onRegenerate }) {
 function LogCallForm({ city, onSave, onCancel }) {
   const [notes, setNotes] = useState('')
   const [outcome, setOutcome] = useState('reached')
-  const [contactType, setContactType] = useState('mayor')
+  const [contactType, setContactType] = useState('mayor_work')
   const [calledAt, setCalledAt] = useState(() => {
     const now = new Date()
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
@@ -662,7 +670,8 @@ function LogCallForm({ city, onSave, onCancel }) {
     onSave({ notes: notes.trim() || null, outcome, contact_type: contactType, called_at: new Date(calledAt).toISOString() })
   }
 
-  const mayorPhone = city.mayor_phone
+  const mayorWorkPhone = city.mayor_work_phone
+  const mayorPersonalPhone = city.mayor_personal_phone
   const cityPhone = city.city_phone
 
   return (
@@ -673,7 +682,8 @@ function LogCallForm({ city, onSave, onCancel }) {
           onChange={e => setContactType(e.target.value)}
           className="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white"
         >
-          <option value="mayor">Mayor direct{mayorPhone ? ` · ${mayorPhone}` : ''}</option>
+          <option value="mayor_work">Mayor work{mayorWorkPhone ? ` · ${mayorWorkPhone}` : ''}</option>
+          <option value="mayor_personal">Mayor personal{mayorPersonalPhone ? ` · ${mayorPersonalPhone}` : ''}</option>
           <option value="city">City line{cityPhone ? ` · ${cityPhone}` : ''}</option>
         </select>
         <select
@@ -719,7 +729,7 @@ const OUTCOME_COLOR = {
   voicemail: 'bg-amber-50 text-amber-700',
   no_answer: 'bg-gray-100 text-gray-500',
 }
-const CONTACT_LABEL = { mayor: 'Mayor direct', city: 'City line' }
+const CONTACT_LABEL = { mayor_work: 'Mayor work', mayor_personal: 'Mayor personal', city: 'City line' }
 
 function CallRow({ call, onDelete }) {
   const [expanded, setExpanded] = useState(false)
@@ -830,7 +840,7 @@ function ContactField({ label, value, link, editable, onSave }) {
 
   return (
     <div className="flex items-baseline gap-1 mb-1 text-xs">
-      <span className="text-gray-400 w-12 shrink-0">{label}</span>
+      <span className="text-gray-400 w-20 shrink-0">{label}</span>
       {value ? (
         link ? (
           <a href={value.startsWith('http') ? value : `https://${value}`}
