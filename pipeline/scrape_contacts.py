@@ -27,6 +27,8 @@ import time
 import json
 import argparse
 import re
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
@@ -64,6 +66,14 @@ HEADERS = {
         'Chrome/122.0.0.0 Safari/537.36'
     ),
 }
+
+# Thread safety
+PRINT_LOCK = threading.Lock()
+DDG_LOCK   = threading.Lock()   # one DDG query at a time across all workers
+
+def _print(*args, **kwargs):
+    with PRINT_LOCK:
+        print(*args, **kwargs)
 
 SKIP_DOMAINS = {
     'whitepages.com', 'spokeo.com', 'beenverified.com', 'intelius.com',
@@ -108,7 +118,10 @@ def get_cities(tier=None, city_ids=None, skip_scraped=False, redo_failed=False, 
                mayor_instagram, mayor_facebook
         FROM cities
         {where}
-        ORDER BY outreach_tier ASC, fair_plan_policies DESC NULLS LAST
+        ORDER BY
+            CASE wildfire_risk_tier WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
+            outreach_tier ASC,
+            fair_plan_policies DESC NULLS LAST
         {lim}
     """
     with engine.connect() as conn:
@@ -527,12 +540,13 @@ def scrape_city(city, on_step=None):
             log.append('  All key fields found — stopping DDG searches early')
             break
 
-        time.sleep(DDG_DELAY)
-        try:
-            ddg_results = list(DDGS().text(query, max_results=6))
-        except Exception as e:
-            log.append(f'  DDG error on query "{query[:60]}": {e}')
-            continue
+        with DDG_LOCK:
+            time.sleep(DDG_DELAY)
+            try:
+                ddg_results = list(DDGS().text(query, max_results=6))
+            except Exception as e:
+                log.append(f'  DDG error on query "{query[:60]}": {e}')
+                continue
 
         log.append(f'  "{query[:70]}" → {len(ddg_results)} results')
 
@@ -575,12 +589,13 @@ def scrape_city(city, on_step=None):
         log.append('Step 3: Direct social media search')
         step('step 3: social search')
         for field, query in social_targets:
-            time.sleep(DDG_DELAY)
-            try:
-                ddg_results = list(DDGS().text(query, max_results=3))
-            except Exception as e:
-                log.append(f'  DDG error: {e}')
-                continue
+            with DDG_LOCK:
+                time.sleep(DDG_DELAY)
+                try:
+                    ddg_results = list(DDGS().text(query, max_results=3))
+                except Exception as e:
+                    log.append(f'  DDG error: {e}')
+                    continue
 
             for r in ddg_results:
                 url = r.get('href', '')
@@ -657,6 +672,8 @@ def main():
                         help='Skip cities already marked completed or partial')
     parser.add_argument('--redo-failed', action='store_true',
                         help='Only redo cities marked as failed')
+    parser.add_argument('--workers', type=int, default=3,
+                        help='Parallel workers (default 3; use 1 for sequential)')
     args = parser.parse_args()
 
     city_ids = (
@@ -677,8 +694,11 @@ def main():
         return
 
     total = len(cities)
-    print(f'Scraping contact info for {total} cities...')
-    print('Results write to DB after each city — safe to interrupt at any time.\n')
+    workers = min(args.workers, total)
+    print(f'Scraping contact info for {total} cities  '
+          f'[{workers} worker{"s" if workers > 1 else ""},'
+          f' high-wildfire-risk first]')
+    print('Results write to DB after each city — safe to interrupt with Ctrl+C.\n')
 
     stats = {'completed': 0, 'partial': 0, 'failed': 0, 'advanced': 0}
     field_counts = {
@@ -686,41 +706,61 @@ def main():
         'work_phone': 0, 'personal_phone': 0,
         'instagram': 0, 'facebook': 0,
     }
+    completed_count = 0
+    WIDTH = 28
+    pad = len(str(total))
 
-    WIDTH = 28  # chars reserved for city name column
-
-    for i, city in enumerate(cities):
-        prefix = f'[{i+1:>{len(str(total))}}/{total}]'
+    def process(city):
         city_col = city['city_name'][:WIDTH].ljust(WIDTH)
 
-        def on_step(desc, _prefix=prefix, _col=city_col):
-            print(f'\r{_prefix} {_col}  {desc:<30}', end='', flush=True)
+        if workers == 1:
+            # Sequential mode: live step updates on same line
+            prefix = f'[{cities.index(city)+1:>{pad}}/{total}]'
 
-        on_step('starting...')
-        try:
-            results, log, status = scrape_city(city, on_step=on_step)
-            advanced = save_results(city['id'], results, log, status)
-            stats[status] = stats.get(status, 0) + 1
-            if advanced:
-                stats['advanced'] += 1
-            for field in field_counts:
-                if results.get(field):
-                    field_counts[field] += 1
+            def on_step(desc, _p=prefix, _c=city_col):
+                print(f'\r{_p} {_c}  {desc:<32}', end='', flush=True)
 
-            found_fields = [f for f in ['work_email', 'personal_email', 'work_phone',
-                                        'personal_phone', 'instagram', 'facebook']
-                            if results.get(f)]
-            result_str = ', '.join(found_fields) if found_fields else 'nothing found'
-            adv_str = ' ↑ advanced' if advanced else ''
+            on_step('starting...')
+        else:
+            on_step = None
+            _print(f'  → starting  {city_col}')
+
+        results, log, status = scrape_city(city, on_step=on_step)
+        advanced = save_results(city['id'], results, log, status)
+
+        found_fields = [f for f in ['work_email', 'personal_email', 'work_phone',
+                                    'personal_phone', 'instagram', 'facebook']
+                        if results.get(f)]
+        result_str = ', '.join(found_fields) if found_fields else 'nothing found'
+        adv_str = '  ↑ advanced' if advanced else ''
+
+        nonlocal completed_count
+        with PRINT_LOCK:
+            completed_count += 1
+            prefix = f'[{completed_count:>{pad}}/{total}]'
             print(f'\r{prefix} {city_col}  {status}: {result_str}{adv_str}')
 
-        except Exception as e:
-            save_results(city['id'], {}, [f'Unexpected error: {e}'], 'failed')
-            stats['failed'] = stats.get('failed', 0) + 1
-            print(f'\r{prefix} {city_col}  ERROR: {e}')
+        return results, status, advanced
 
-        if i + 1 < total:
-            time.sleep(1)
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(process, city): city for city in cities}
+        try:
+            for future in as_completed(futures):
+                try:
+                    results, status, advanced = future.result()
+                    stats[status] = stats.get(status, 0) + 1
+                    if advanced:
+                        stats['advanced'] += 1
+                    for field in field_counts:
+                        if results.get(field):
+                            field_counts[field] += 1
+                except Exception as e:
+                    city = futures[future]
+                    save_results(city['id'], {}, [f'Unexpected error: {e}'], 'failed')
+                    stats['failed'] = stats.get('failed', 0) + 1
+                    _print(f'  ERROR {city["city_name"]}: {e}')
+        except KeyboardInterrupt:
+            _print('\n\nInterrupted — results so far have been saved to DB.')
 
     print(f'\n{"=" * 50}')
     print(f'Scrape complete: {total} cities')
