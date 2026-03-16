@@ -324,7 +324,9 @@ def _parse_sonnet_json(raw):
 
 def sonnet_extract_city_page(page_text, mayor_name, city_name, source_url):
     """Extract contact info from an official city website page."""
-    prompt = f"""Extract contact information for the mayor from this city government webpage.
+    prompt = f"""You are extracting contact information for a political outreach campaign. \
+Your job is to find every usable piece of contact info on this page. Be thorough and aggressive — \
+missing a real piece of contact info is a worse mistake than flagging something for review.
 
 Mayor name: {mayor_name}
 City: {city_name}
@@ -334,10 +336,18 @@ Page content:
 {page_text}
 ---
 
-Extract any of the following that appear on the page:
-- Mayor's direct phone number (NOT the general city hall number unless explicitly listed as the mayor's line)
-- Mayor's direct email address
-- Links or handles for the mayor's social media (Instagram, Facebook, Twitter/X, LinkedIn, etc.)
+Extract ALL of the following that appear anywhere on the page:
+
+EMAILS — look everywhere: mailto: links, contact forms, staff directories, \
+"Email the Mayor" buttons, footer text, sidebar bios. If you see any email address \
+associated with the mayor or their office, capture it.
+
+PHONE NUMBERS — look for any number labeled as the mayor's direct line, \
+cell, or office. If the only number on the page is the general city hall line \
+but it's the only way to reach the mayor, capture it anyway and note it in work_phone.
+
+SOCIAL MEDIA — look for profile links, icons with href attributes, \
+"Follow us" sections, bio pages. Capture Instagram, Facebook, Twitter/X, LinkedIn.
 
 Return ONLY valid JSON:
 {{
@@ -346,10 +356,12 @@ Return ONLY valid JSON:
   "instagram": "@handle or null",
   "facebook": "handle or full page URL or null",
   "other_social": {{"platform": "platform name", "handle": "handle or URL"}} or null,
-  "notes": "brief note on what was found or not found"
+  "notes": "what you found and where, or what was missing"
 }}
 
-If a field is not found, use null. Do NOT guess or fabricate."""
+If a field is genuinely not present anywhere on the page, use null. \
+Do NOT fabricate — but do not be overly cautious either. \
+A real email address you spotted is always worth returning."""
 
     try:
         resp = client.messages.create(
@@ -387,33 +399,48 @@ PERSONAL_DOMAINS = {
 
 def sonnet_extract_search_result(page_text, mayor_name, city_name, source_url):
     """Extract contact info from a general web page found via search."""
-    prompt = f"""I'm looking for contact information and social media accounts for {mayor_name}, Mayor of {city_name}, California.
+    prompt = f"""You are extracting contact information for a political outreach campaign. \
+Your job is to find every usable email address, phone number, and social media account \
+for this specific person. Be thorough — missing a real contact is worse than flagging \
+something as medium confidence.
 
-Webpage content:
+Target: {mayor_name}, Mayor of {city_name}, California.
+
+Content (may include webpage text, search snippets, or PDF excerpts):
 ---
 {page_text}
 ---
 
-Extract any of the following that belong to this specific person:
-- Phone numbers (work = official city/government number; personal = cell/home)
-- Email addresses (work = @city domain or government domain; personal = gmail/yahoo/outlook/campaign domain)
-- Instagram handle
-- Facebook page or handle
-- Any other social media profile (one only — most useful for political outreach)
+Extract everything that plausibly belongs to this person:
+
+EMAILS — capture any email address associated with this mayor. \
+Work emails typically end in a city/gov domain. Personal emails are gmail/yahoo/etc \
+or campaign domains. If you see an email that might be theirs, return it — \
+don't skip it just because you're not 100% sure.
+
+PHONE NUMBERS — capture any number that could be this mayor's direct line, \
+cell, campaign phone, or city office. If you see a number near their name, capture it.
+
+SOCIAL MEDIA — Instagram, Facebook, Twitter/X, LinkedIn handles or profile URLs.
+
+IDENTITY CHECK — many people share names. Before returning anything, confirm \
+the content is about this specific person (e.g., mentions {city_name}, "mayor", \
+or other identifying details). If it's clearly a different person, return confidence "low". \
+If it's probably the right person but not 100% certain, return confidence "medium" — \
+still return the data.
 
 Return ONLY valid JSON:
 {{
-  "phones": [{{"number": "...", "type": "work|personal|unknown", "context": "brief context"}}],
-  "emails": [{{"address": "...", "type": "work|personal|unknown", "context": "brief context"}}],
+  "phones": [{{"number": "...", "type": "work|personal|unknown", "context": "where you saw it"}}],
+  "emails": [{{"address": "...", "type": "work|personal|unknown", "context": "where you saw it"}}],
   "instagram": "@handle or null",
   "facebook": "handle or page URL or null",
   "other_social": {{"platform": "...", "handle": "..."}} or null,
   "confidence": "high|medium|low",
-  "notes": "..."
+  "notes": "brief summary of what you found"
 }}
 
-IMPORTANT: Only return info you are confident belongs to this specific person.
-Many people share common names. If uncertain, set confidence to "low". Do NOT fabricate."""
+Do NOT fabricate. But do return real data you spotted even if confidence is medium."""
 
     try:
         resp = client.messages.create(
@@ -423,7 +450,7 @@ Many people share common names. If uncertain, set confidence to "low". Do NOT fa
         data = _parse_sonnet_json(resp.content[0].text)
 
         if data.get('confidence') == 'low':
-            return {}, f'Low confidence from {source_url}'
+            return {}, f'Skipped (low confidence, likely wrong person): {source_url}'
 
         result = {}
 
