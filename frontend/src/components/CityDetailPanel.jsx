@@ -339,21 +339,50 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1 font-medium">Mayor</p>
-                <ContactField label="Work Email" value={city.mayor_work_email} editable
-                  onSave={v => save({ mayor_work_email: v })} />
-                <ContactField label="Work Phone" value={city.mayor_work_phone} editable
-                  onSave={v => save({ mayor_work_phone: v })} />
-                <ContactField label="Personal Email" value={city.mayor_personal_email} editable
-                  onSave={v => save({ mayor_personal_email: v })} />
-                <ContactField label="Personal Phone" value={city.mayor_personal_phone} editable
-                  onSave={v => save({ mayor_personal_phone: v })} />
-                <ContactField label="Instagram" value={city.mayor_instagram} editable
-                  onSave={v => save({ mayor_instagram: v })} />
-                <ContactField label="Facebook" value={city.mayor_facebook} editable
-                  onSave={v => save({ mayor_facebook: v })} />
-                {!city.mayor_work_email && !city.mayor_work_phone && !city.mayor_personal_email && !city.mayor_personal_phone && !city.mayor_instagram && !city.mayor_facebook && (
-                  <p className="text-xs text-gray-400 italic">Not yet collected</p>
-                )}
+                {(() => {
+                  const wasSearched = !!city.contact_scrape_status && city.contact_scrape_status !== 'not_scraped'
+                  const hasAny = city.mayor_work_email || city.mayor_work_phone || city.mayor_personal_email || city.mayor_personal_phone || city.mayor_instagram || city.mayor_facebook || city.mayor_other_social_handle
+                  return (
+                    <>
+                      <ContactField label="Work Email" value={city.mayor_work_email} editable
+                        onSave={v => save({ mayor_work_email: v })}
+                        sourceUrl={city.mayor_work_email_source} wasSearched={wasSearched} />
+                      <ContactField label="Work Phone" value={city.mayor_work_phone} editable
+                        onSave={v => save({ mayor_work_phone: v })}
+                        sourceUrl={city.mayor_work_phone_source} wasSearched={wasSearched} />
+                      <ContactField label="Personal Email" value={city.mayor_personal_email} editable
+                        onSave={v => save({ mayor_personal_email: v })}
+                        sourceUrl={city.mayor_personal_email_source} wasSearched={wasSearched} />
+                      <ContactField label="Personal Phone" value={city.mayor_personal_phone} editable
+                        onSave={v => save({ mayor_personal_phone: v })}
+                        sourceUrl={city.mayor_personal_phone_source} wasSearched={wasSearched} />
+                      <ContactField label="Instagram" value={city.mayor_instagram} editable
+                        onSave={v => save({ mayor_instagram: v })}
+                        sourceUrl={city.mayor_instagram_source} wasSearched={wasSearched} />
+                      <ContactField label="Facebook" value={city.mayor_facebook} editable
+                        onSave={v => save({ mayor_facebook: v })}
+                        sourceUrl={city.mayor_facebook_source} wasSearched={wasSearched} />
+                      {city.mayor_other_social_handle && (
+                        <ContactField
+                          label={city.mayor_other_social_platform || 'Other'}
+                          value={city.mayor_other_social_handle}
+                          sourceUrl={city.mayor_other_social_source}
+                        />
+                      )}
+                      {!hasAny && !wasSearched && (
+                        <p className="text-xs text-gray-400 italic">Not yet collected</p>
+                      )}
+                      {city.contact_scrape_date && (
+                        <p className="text-xs text-gray-300 mt-1.5">
+                          Scraped {new Date(city.contact_scrape_date).toLocaleDateString()}
+                          {city.contact_scrape_status === 'partial' && (
+                            <span className="ml-1 text-yellow-500">· partial</span>
+                          )}
+                        </p>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </div>
           </section>
@@ -816,7 +845,7 @@ function Spinner() {
   )
 }
 
-function ContactField({ label, value, link, editable, onSave }) {
+function ContactField({ label, value, link, editable, onSave, sourceUrl, wasSearched }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(value || '')
 
@@ -842,20 +871,32 @@ function ContactField({ label, value, link, editable, onSave }) {
     <div className="flex items-baseline gap-1 mb-1 text-xs">
       <span className="text-gray-400 w-20 shrink-0">{label}</span>
       {value ? (
-        link ? (
-          <a href={value.startsWith('http') ? value : `https://${value}`}
-            target="_blank" rel="noreferrer"
-            className="text-blue-600 hover:underline truncate">{value}</a>
-        ) : (
-          <span
-            className={`text-gray-700 truncate ${editable ? 'cursor-pointer hover:text-blue-600' : ''}`}
-            onClick={() => editable && setEditing(true)}
-          >{value}</span>
-        )
+        <span className="flex items-center gap-1 min-w-0">
+          {link ? (
+            <a href={value.startsWith('http') ? value : `https://${value}`}
+              target="_blank" rel="noreferrer"
+              className="text-blue-600 hover:underline truncate">{value}</a>
+          ) : (
+            <span
+              className={`text-gray-700 truncate ${editable ? 'cursor-pointer hover:text-blue-600' : ''}`}
+              onClick={() => editable && setEditing(true)}
+            >{value}</span>
+          )}
+          {sourceUrl && (
+            <a href={sourceUrl} target="_blank" rel="noreferrer"
+              title={`Source: ${sourceUrl}`}
+              className="text-gray-300 hover:text-blue-400 shrink-0"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          )}
+        </span>
       ) : editable ? (
-        <button onClick={() => setEditing(true)} className="text-blue-500 hover:underline italic">
-          Add...
-        </button>
+        wasSearched
+          ? <span className="text-gray-300 italic">Not found</span>
+          : <button onClick={() => setEditing(true)} className="text-blue-500 hover:underline italic">Add...</button>
       ) : null}
     </div>
   )
