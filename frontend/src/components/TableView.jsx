@@ -1,4 +1,5 @@
 import { STATUS_MAP, TIER_COLORS } from '../constants'
+import * as XLSX from 'xlsx'
 
 const COLUMNS = [
   { key: 'city_name', label: 'City', sort: true },
@@ -11,11 +12,58 @@ const COLUMNS = [
   { key: 'last_contacted', label: 'Last Contact', sort: true },
 ]
 
+function exportToExcel(cities) {
+  const rows = cities.map(c => ({
+    'City': c.city_name || '',
+    'Mayor': c.mayor || '',
+    'County': c.county || '',
+    'Population': c.population || '',
+    'Tier': c.outreach_tier || '',
+    'Status': STATUS_MAP[c.outreach_status]?.label || c.outreach_status || '',
+    'City Email': c.city_email || '',
+    'Mayor Email': c.mayor_email || '',
+    'City Phone': c.city_phone || '',
+    'Mayor Phone': c.mayor_phone || '',
+    'FAIR Plan Policies': c.fair_plan_policies || '',
+    'FAIR Plan Exposure': c.fair_plan_exposure || '',
+    'Wildfire Risk': c.wildfire_risk_tier || '',
+    'Moratorium Active': c.moratorium_active ? 'Yes' : '',
+    'Distressed County': c.is_distressed_county ? 'Yes' : '',
+    'Congressional District': c.congressional_district || '',
+    'Senate District': c.state_senate_district || '',
+    'Assembly District': c.state_assembly_district || '',
+    'Last Contacted': c.last_contacted ? new Date(c.last_contacted).toLocaleDateString() : '',
+    'Next Action': c.next_action || '',
+    'Next Action Date': c.next_action_date || '',
+    'Notes': c.notes || '',
+  }))
+
+  const ws = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Cities')
+
+  const date = new Date().toISOString().slice(0, 10)
+  XLSX.writeFile(wb, `mayor-endorsements-${date}.xlsx`)
+}
+
 export default function TableView({ cities, onCityClick, selected, onSelect, sortBy, sortOrder, onSort }) {
   const allSelected = cities.length > 0 && cities.every(c => selected.has(c.id))
 
   return (
-    <div className="overflow-auto h-full">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-1 pb-2 shrink-0">
+        <span className="text-xs text-gray-400">{cities.length} cities</span>
+        <button
+          onClick={() => exportToExcel(cities)}
+          className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export to Excel
+        </button>
+      </div>
+    <div className="overflow-auto flex-1">
       <table className="w-full text-sm border-collapse">
         <thead className="sticky top-0 bg-gray-50 z-10">
           <tr>
@@ -90,6 +138,7 @@ export default function TableView({ cities, onCityClick, selected, onSelect, sor
           })}
         </tbody>
       </table>
+    </div>
     </div>
   )
 }
