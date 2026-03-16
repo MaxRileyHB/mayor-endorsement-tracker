@@ -145,6 +145,7 @@ export default function App() {
     setCities(prev => prev.map(c => c.id === updated.id ? updated : c))
     setActiveCity(prev => prev?.id === updated.id ? updated : prev)
     loadStats()
+    loadUnread()
   }
 
   const handleBatchStatus = (status) => {

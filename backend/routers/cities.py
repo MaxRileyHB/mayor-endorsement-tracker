@@ -8,6 +8,12 @@ import sys
 sys.path.append("..")
 from database import get_db
 from models import City, ActivityLog, Email, CallLog
+
+# Statuses where a "responded" flag is no longer relevant — city has been actioned
+RESPONDED_CLEAR_STATUSES = {
+    "ready_for_outreach", "outreach_sent", "in_conversation",
+    "call_scheduled", "endorsed", "declined", "follow_up", "not_pursuing",
+}
 from schemas import CityRead, CityUpdate, CityBase, BatchUpdate, StatsResponse, EmailRead, CallLogRead, CallLogCreate
 
 router = APIRouter(prefix="/api/cities", tags=["cities"])
@@ -163,6 +169,11 @@ def update_city(city_id: int, update: CityUpdate, db: Session = Depends(get_db))
             details="; ".join(changes),
         )
         db.add(log)
+
+    # Clear responded flag when city is moved to a stage where response has been actioned
+    new_status = update.outreach_status
+    if new_status and new_status in RESPONDED_CLEAR_STATUSES and new_status != old_status:
+        db.query(Email).filter(Email.city_id == city_id).update({"is_read": True})
 
     db.commit()
     db.refresh(city)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { updateCity, getCity, getActivity, getCityDrafts, getCityEmails, getCityCalls, createCallLog, deleteCallLog, updateDraft, regenerateDraft, generateDrafts, sendDrafts, markEmailsRead } from '../api'
+import { updateCity, getCity, getActivity, getCityDrafts, getCityEmails, getCityCalls, createCallLog, deleteCallLog, updateDraft, regenerateDraft, generateDrafts, sendDrafts } from '../api'
 import { STATUSES, TIER_COLORS } from '../constants'
 import { SkeletonSection } from './Skeleton'
 
@@ -49,7 +49,6 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
     getCityDrafts(city.id).then(setDrafts).catch(() => {}).finally(() => setLoadingDrafts(false))
     getCityEmails(city.id).then(setEmails).catch(() => {}).finally(() => setLoadingEmails(false))
     getCityCalls(city.id).then(setCalls).catch(() => {})
-    markEmailsRead(city.id).catch(() => {})
   }, [city?.id])
 
   // Poll for new draft after clicking generate
