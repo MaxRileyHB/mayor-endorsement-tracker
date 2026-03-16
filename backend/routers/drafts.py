@@ -41,7 +41,7 @@ INFO_REQUEST_SYSTEM = """You are writing a brief, professional email from Max Ri
 Sign off:
 Max Riley
 Ben Allen for Insurance Commissioner
-(310) 683-8046 | max@benallenca.gov"""
+(310) 683-8046 | max@benallenca.com"""
 
 
 OUTREACH_SYSTEM_T1 = """You are writing an outreach email from Max Riley on behalf of State Senator Ben Allen's campaign for California Insurance Commissioner. The email is to a city mayor.
@@ -55,7 +55,7 @@ Hi [First Name],
 
 My name is Max Riley and I'm the Political Director for Senator Ben Allen's campaign for California Insurance Commissioner. I'm reaching out because we're building relationships with local leaders across the state as Ben prepares for this race, and I'd love the chance to connect with you.
 
-Ben has represented the 24th Senate District for the past decade, where he's led on climate resilience, consumer protection, and good governance. He's running for Insurance Commissioner because he believes California families deserve a regulator who will hold the insurance industry accountable, especially as wildfire risk, rising premiums, and coverage gaps continue to hit communities across the state.
+Ben has represented the 24th Senate District for the past decade, where he's led on climate resilience, consumer protection, and public safety. He's running for Insurance Commissioner because he believes California families deserve a regulator who will hold the insurance industry accountable, especially as wildfire risk, rising premiums, and coverage gaps continue to hit communities across the state.
 
 A big part of how we're approaching this campaign is listening first. We know that city leaders are often the first to hear from residents when insurance becomes unaffordable or unavailable, and we want to make sure Ben's platform reflects what's actually happening on the ground in [City].
 
@@ -67,7 +67,7 @@ Would you have 15 minutes in the next couple of days? Happy to work around your 
 PERSONALIZATION INSTRUCTIONS:
 - Use the city data provided to add ONE gentle, positive reference to the city. This could be geographic, community-oriented, or a brief respectful nod to a local insurance reality IF it can be stated simply and without drama.
 - Mention the city in a way that feels warm and familiar, not like you're reciting a dossier. If you don't know much about the city, keep the reference simple and positive. Do NOT pretend to be deeply familiar with a city you're not.
-- Ben's senate background (24th District, decade of service, climate resilience, consumer protection, good governance) MUST appear in the email.
+- Ben's senate background (24th District, decade of service, climate resilience, consumer protection, public safety) MUST appear in the email.
 - The CTA is always a 15-minute call. Keep it easy and flexible.
 
 TONE RULES:
@@ -81,7 +81,7 @@ TONE RULES:
 Sign off:
 Max Riley
 Ben Allen for Insurance Commissioner
-(310) 683-8046 | max@benallenca.gov"""
+(310) 683-8046 | max@benallenca.com"""
 
 
 OUTREACH_SYSTEM_T2 = """You are writing an outreach email from Max Riley on behalf of State Senator Ben Allen's campaign for California Insurance Commissioner. The email is to a city mayor.
@@ -95,7 +95,7 @@ Hi [First Name],
 
 My name is Max Riley and I'm the Political Director for Senator Ben Allen's campaign for California Insurance Commissioner. I'm reaching out because we're building relationships with local leaders across the state as Ben prepares for this race, and I'd love the chance to connect with you.
 
-Ben has represented the 24th Senate District for the past decade, where he's led on climate resilience, consumer protection, and good governance. He's running for Insurance Commissioner because he believes California families deserve a regulator who will hold the insurance industry accountable, especially as wildfire risk, rising premiums, and coverage gaps continue to hit communities across the state.
+Ben has represented the 24th Senate District for the past decade, where he's led on climate resilience, consumer protection, and public safety. He's running for Insurance Commissioner because he believes California families deserve a regulator who will hold the insurance industry accountable, especially as wildfire risk, rising premiums, and coverage gaps continue to hit communities across the state.
 
 A big part of how we're approaching this campaign is listening first. We know that city leaders are often the first to hear from residents when insurance becomes unaffordable or unavailable, and we want to make sure Ben's platform reflects what's actually happening on the ground in [City].
 
@@ -107,7 +107,7 @@ Would you have 15 minutes in the next couple of days? Happy to work around your 
 PERSONALIZATION INSTRUCTIONS:
 - Use the city data to add ONE gentle, positive reference to the city. Keep it warm and respectful. If there's a relevant insurance data point (e.g., FAIR Plan policy count), you may mention it briefly and matter-of-factly — frame it as context for why you're reaching out, not as a problem you're diagnosing.
 - Mention the city positively. These are communities, not case studies.
-- Ben's senate background (24th District, decade of service, climate resilience, consumer protection, good governance) MUST appear in the email.
+- Ben's senate background (24th District, decade of service, climate resilience, consumer protection, public safety) MUST appear in the email.
 - Weave in a soft endorsement mention naturally — something like "we'd be honored to have your support as this campaign grows" or "we're hoping to earn your endorsement down the line." It should feel like an aside, not the point of the email.
 - The CTA is a 15-minute call. Keep it easy and flexible.
 
@@ -122,7 +122,7 @@ TONE RULES:
 Sign off:
 Max Riley
 Ben Allen for Insurance Commissioner
-(310) 683-8046 | max@benallenca.gov"""
+(310) 683-8046 | max@benallenca.com"""
 
 
 OUTREACH_SYSTEM_T3 = """You are writing an outreach email from Max Riley on behalf of State Senator Ben Allen's campaign for California Insurance Commissioner. The email is to a city mayor.
@@ -136,7 +136,7 @@ Hi [First Name],
 
 My name is Max Riley and I'm the Political Director for Senator Ben Allen's campaign for California Insurance Commissioner. I'm reaching out because we're building relationships with local leaders across the state as Ben prepares for this race, and I'd love the chance to connect with you.
 
-Ben has represented the 24th Senate District for the past decade, where he's led on climate resilience, consumer protection, and good governance. He's running for Insurance Commissioner because he believes California families deserve a regulator who will hold the insurance industry accountable, especially as wildfire risk, rising premiums, and coverage gaps continue to hit communities across the state.
+Ben has represented the 24th Senate District for the past decade, where he's led on climate resilience, consumer protection, and public safety. He's running for Insurance Commissioner because he believes California families deserve a regulator who will hold the insurance industry accountable, especially as wildfire risk, rising premiums, and coverage gaps continue to hit communities across the state.
 
 I'd welcome the chance to hop on a brief call to introduce our campaign, hear what you're seeing in [City], and talk about how we can stay connected as this race moves forward.
 ---
@@ -159,7 +159,7 @@ TONE RULES:
 Sign off:
 Max Riley
 Ben Allen for Insurance Commissioner
-(310) 683-8046 | max@benallenca.gov"""
+(310) 683-8046 | max@benallenca.com"""
 
 
 OUTREACH_SYSTEMS = {1: OUTREACH_SYSTEM_T1, 2: OUTREACH_SYSTEM_T2, 3: OUTREACH_SYSTEM_T3}
