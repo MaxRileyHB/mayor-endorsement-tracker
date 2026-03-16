@@ -6,7 +6,7 @@ export default function CityCard({ city, onClick, selected, onSelect, hasUnread 
   return (
     <div
       className={`bg-white border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow text-sm
-        ${selected ? 'ring-2 ring-blue-500 border-blue-300' : hasUnread ? 'border-green-400 ring-1 ring-green-300' : 'border-gray-200'}`}
+        ${selected ? 'ring-2 ring-blue-500 border-blue-300' : 'border-gray-200'}`}
       onClick={() => onClick(city)}
     >
       <div className="flex items-start gap-2">
@@ -24,8 +24,8 @@ export default function CityCard({ city, onClick, selected, onSelect, hasUnread 
               T{tier}
             </span>
             {hasUnread && (
-              <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full font-medium shrink-0">
-                New
+              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium shrink-0">
+                Response
               </span>
             )}
           </div>

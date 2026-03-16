@@ -29,8 +29,8 @@ export default function KanbanBoard({ cities, onCityClick, selected, onSelect, u
               </span>
               <span className="text-xs text-gray-400">{cols.length}</span>
               {unreadCount > 0 && (
-                <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full font-medium">
-                  {unreadCount} new
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">
+                  {unreadCount} response{unreadCount > 1 ? 's' : ''}
                 </span>
               )}
             </div>
