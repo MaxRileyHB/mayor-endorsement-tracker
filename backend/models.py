@@ -68,6 +68,9 @@ class City(Base):
     moratorium_active = Column(Boolean, default=False)
     wildfire_risk_tier = Column(String(10))
 
+    # Research
+    city_blurb = Column(Text)  # 1-2 sentence Wikipedia summary, cached on first draft generation
+
     # Pipeline
     outreach_status = Column(String(50), default="no_contact_info", index=True)
     outreach_tier = Column(Integer, default=3, index=True)

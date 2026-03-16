@@ -33,6 +33,19 @@ try:
         _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS contact_scrape_status VARCHAR(50) DEFAULT 'not_scraped'"))
         _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS contact_scrape_date TIMESTAMP"))
         _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS contact_scrape_log TEXT"))
+        _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS city_blurb TEXT"))
+        # Recompute outreach_tier using the algorithmic email tier system
+        _conn.execute(text("""
+            UPDATE cities SET outreach_tier =
+              CASE
+                WHEN population >= 100000 THEN 1
+                WHEN population BETWEEN 30000 AND 99999 THEN 2
+                WHEN fair_plan_policies >= 1000 THEN 2
+                WHEN moratorium_active = true THEN 2
+                WHEN is_distressed_county = true AND population >= 15000 THEN 2
+                ELSE 3
+              END
+        """))
         # Migrate legacy mayor_email / mayor_phone into the new work fields (only where new fields are blank)
         _conn.execute(text("""
             UPDATE cities

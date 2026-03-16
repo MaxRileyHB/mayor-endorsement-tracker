@@ -19,43 +19,124 @@ def _get_anthropic():
     return anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 
-INFO_REQUEST_SYSTEM = """You are writing a brief, professional email on behalf of Max Riley from State Senator Ben Allen's campaign for California Insurance Commissioner. The email is being sent to a city's general email address to request the mayor's direct contact information.
+def fetch_wikipedia_blurb(city_name: str) -> str:
+    import re, requests
+    title = f"{city_name}, California"
+    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{requests.utils.quote(title)}"
+    try:
+        r = requests.get(url, timeout=5, headers={"User-Agent": "MayorEndorsementTracker/1.0"})
+        if r.status_code == 200:
+            extract = r.json().get("extract", "")
+            sentences = re.split(r'(?<=[.!?])\s+', extract.strip())
+            return " ".join(sentences[:2])
+    except Exception:
+        pass
+    return ""
 
-Keep it to 3-4 short paragraphs. Be warm but professional. Mention one specific reason you want to connect with the mayor that is relevant to their city (e.g., wildfire risk, FAIR Plan reliance, insurance affordability). Sign off as Max Riley, Ben Allen for Insurance Commissioner.
 
-Do NOT use overly formal language. Do NOT use "Dear Sir/Madam." Do use the mayor's name if known. Do NOT use em dashes. Do NOT include a subject line in the body — output only the email body text itself.
+INFO_REQUEST_SYSTEM = """You are writing a brief, professional email from Max Riley, State Senator Ben Allen's campaign for California Insurance Commissioner, to a city's general inbox requesting the mayor's direct contact info.
 
-Sign off with this exact signature:
+2-3 short paragraphs. Warm but professional. Mention one specific reason — relevant to that city's situation — why connecting with the mayor matters. No "Dear Sir/Madam." No em dashes. Output only the email body.
+
+Sign off:
 Max Riley
 Ben Allen for Insurance Commissioner
 (310) 683-8046 | max@benallenca.gov"""
 
 
-OUTREACH_SYSTEM = """You are writing a personalized endorsement outreach email on behalf of Max Riley from State Senator Ben Allen's campaign for California Insurance Commissioner. The email is to a city mayor requesting their endorsement.
+OUTREACH_SYSTEM_T1 = """You are writing a concise outreach email from Max Riley, State Senator Ben Allen's campaign for California Insurance Commissioner, to a city mayor.
 
-Key messaging pillars for Ben Allen:
-- FAIR Plan reform and stabilization
-- Insurance affordability and availability for homeowners
-- Wildfire resilience and community preparedness
-- Consumer protection and rate transparency
-- Ben's legislative record on insurance and environmental issues as a State Senator
+This is a Tier 1 mayor — a high-profile official in a major city. DO NOT ask for an endorsement in this email. The goal is to earn a conversation. These mayors get endorsement requests constantly and will ignore a cold ask from someone they don't know.
 
-Keep it to 4-5 short paragraphs. Be warm, direct, and specific. Reference concrete data about the city's insurance situation. Make a clear ask for the endorsement. Offer a phone call to discuss further.
+Instead, the frame is: Senator Allen is running for Insurance Commissioner, he's building his platform around issues that directly affect this mayor's city, and he wants to hear from mayors on the front lines of the insurance crisis before the election. You are offering the mayor a seat at the table, not asking for a favor.
 
-Do NOT be wonky or overly policy-heavy. DO make it feel personal and specific to their city. Do NOT use em dashes. Do NOT include a subject line in the body — output only the email body text itself.
+Ben Allen's focus: FAIR Plan reform, insurance affordability, wildfire resilience, consumer protection.
 
-Sign off with this exact signature:
+3 short paragraphs:
+1. Open with something specific to their city's insurance situation — make it clear you've done your homework and this isn't a mass email.
+2. Explain that Senator Allen is talking to mayors across California to understand local insurance challenges and shape his platform. Position the mayor as someone whose perspective matters.
+3. Close with a CTA offering a 15-minute call or meeting — keep it low-commitment. Something like "Would you have 15 minutes in the next couple weeks for a brief call?"
+
+Warm, respectful, not salesy. No em dashes. Output only the email body.
+
+Sign off:
 Max Riley
 Ben Allen for Insurance Commissioner
 (310) 683-8046 | max@benallenca.gov"""
+
+
+OUTREACH_SYSTEM_T2 = """You are writing a concise outreach email from Max Riley, State Senator Ben Allen's campaign for California Insurance Commissioner, to a city mayor.
+
+This is a Tier 2 mayor — a mid-size city official whose community has real insurance challenges. The goal is to invite them into a coalition. You CAN mention the word "endorsement" but it should not be the lead. The frame is: Senator Allen is building a statewide coalition of mayors who understand the insurance crisis firsthand, and this mayor's city belongs in that coalition. The endorsement is presented as joining something meaningful, not doing a favor for a stranger.
+
+Ben Allen's focus: FAIR Plan reform, insurance affordability, wildfire resilience, consumer protection.
+
+3 short paragraphs:
+1. Open with something specific to their city's insurance situation — a concrete number or fact that shows you know what their residents are dealing with.
+2. Introduce Ben Allen briefly and explain he's building a coalition of mayors who are living the insurance crisis. Mention one specific credential or policy position. Frame the endorsement as "adding your city's voice to this effort" rather than a personal favor.
+3. Close with a CTA — offer a brief call to discuss his platform and the endorsement, or let them know they can reach out directly. Make it easy to say yes.
+
+Warm, direct, community-focused. No em dashes. Output only the email body.
+
+Sign off:
+Max Riley
+Ben Allen for Insurance Commissioner
+(310) 683-8046 | max@benallenca.gov"""
+
+
+OUTREACH_SYSTEM_T3 = """You are writing a concise outreach email from Max Riley, State Senator Ben Allen's campaign for California Insurance Commissioner, to a city mayor.
+
+This is a Tier 3 mayor — a smaller city where the mayor may not get many statewide endorsement requests. Be warm and respectful but get to the point. These mayors are often part-time officials who are busy and will appreciate brevity. Many will be flattered by a direct, personal ask and may say yes without needing a call.
+
+Ben Allen's focus: FAIR Plan reform, insurance affordability, wildfire resilience, consumer protection.
+
+3 short paragraphs:
+1. Open with a brief, specific reference to their city — even one sentence showing you know something about the community. If there's an insurance hook (FAIR Plan reliance, wildfire risk), use it. If not, a quick geographic or community reference works.
+2. Introduce Ben Allen in one sentence and make a clear, direct endorsement ask. Don't hedge. "We'd be honored to have your endorsement" is the right energy.
+3. Close with a brief CTA — offer a call if they want to learn more, but make it clear they can also just reply to endorse. Remove friction.
+
+Warm, direct, brief. No em dashes. Output only the email body.
+
+Sign off:
+Max Riley
+Ben Allen for Insurance Commissioner
+(310) 683-8046 | max@benallenca.gov"""
+
+
+OUTREACH_SYSTEMS = {1: OUTREACH_SYSTEM_T1, 2: OUTREACH_SYSTEM_T2, 3: OUTREACH_SYSTEM_T3}
+
+
+def assign_email_tier(city) -> int:
+    """Compute outreach tier from city data. Tier 1 wins if multiple conditions match."""
+    if city.population and city.population >= 100000:
+        return 1
+    if (
+        (city.population and city.population >= 30000) or
+        (city.fair_plan_policies and city.fair_plan_policies >= 1000) or
+        city.moratorium_active or
+        (city.is_distressed_county and city.population and city.population >= 15000)
+    ):
+        return 2
+    return 3
 
 
 def generate_draft_for_city(city: City, draft_type: str, batch_id: str, db: Session):
     client = _get_anthropic()
 
+    # Get or fetch and cache Wikipedia blurb
+    blurb = city.city_blurb
+    if not blurb:
+        blurb = fetch_wikipedia_blurb(city.city_name)
+        if blurb:
+            city.city_blurb = blurb
+            db.add(city)
+            db.commit()
+
     if draft_type == "info_request":
         to_address = city.city_email or ""
         context_parts = [f"City: {city.city_name}, {city.county} County"]
+        if blurb:
+            context_parts.append(f"Background: {blurb}")
         if city.mayor:
             context_parts.append(f"Mayor: {city.mayor}")
         if city.moratorium_active and city.moratorium_fires:
@@ -71,9 +152,12 @@ def generate_draft_for_city(city: City, draft_type: str, batch_id: str, db: Sess
         subject = f"Request for Mayor's Contact Information — Ben Allen for Insurance Commissioner"
 
     else:  # endorsement_outreach
+        tier = city.outreach_tier or assign_email_tier(city)
         to_address = city.mayor_work_email or city.mayor_personal_email or city.mayor_email or city.city_email or ""
-        context_parts = [
-            f"City: {city.city_name}, {city.county} County",
+        context_parts = [f"City: {city.city_name}, {city.county} County"]
+        if blurb:
+            context_parts.append(f"Background: {blurb}")
+        context_parts += [
             f"Population: {city.population:,}" if city.population else "",
             f"Mayor: {city.mayor}" if city.mayor else "",
             f"FAIR Plan policies: {city.fair_plan_policies:,}" if city.fair_plan_policies else "",
@@ -87,8 +171,12 @@ def generate_draft_for_city(city: City, draft_type: str, batch_id: str, db: Sess
             context_parts.append(f"Active insurance moratorium — fires: {fires}")
 
         user_prompt = "\n".join(p for p in context_parts if p)
-        system = OUTREACH_SYSTEM
-        subject = f"Endorsement Request — Ben Allen for California Insurance Commissioner"
+        system = OUTREACH_SYSTEMS[tier]
+        subject = {
+            1: f"Insurance in {city.city_name} — Sen. Ben Allen",
+            2: f"Sen. Ben Allen for Insurance Commissioner — {city.city_name}",
+            3: f"Endorsement request — Ben Allen for Insurance Commissioner",
+        }[tier]
 
     try:
         response = client.messages.create(
@@ -114,7 +202,7 @@ def generate_draft_for_city(city: City, draft_type: str, batch_id: str, db: Sess
         body=body,
         status="pending_review",
         batch_id=batch_id,
-        research_context={"city_name": city.city_name, "tier": city.outreach_tier},
+        research_context={"city_name": city.city_name, "tier": tier if draft_type != "info_request" else (city.outreach_tier or assign_email_tier(city))},
     )
     db.add(draft)
     db.commit()

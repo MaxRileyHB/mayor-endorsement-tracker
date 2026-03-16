@@ -60,6 +60,7 @@ class CityBase(BaseModel):
     next_action_date: Optional[date] = None
     notes: Optional[str] = None
     incorporated_date: Optional[str] = None
+    city_blurb: Optional[str] = None
 
 
 class CityRead(CityBase):
