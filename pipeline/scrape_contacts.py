@@ -35,7 +35,7 @@ from bs4 import BeautifulSoup
 from duckduckgo_search import DDGS
 import anthropic
 from sqlalchemy import create_engine, text
-from utils import get_anthropic_client, Progress
+from utils import get_anthropic_client
 
 # ── Load environment ──────────────────────────────────────────────────────────
 from pathlib import Path
@@ -480,16 +480,21 @@ def has_all_key_fields(r):
 
 # ── Per-city scrape pipeline ───────────────────────────────────────────────────
 
-def scrape_city(city):
+def scrape_city(city, on_step=None):
     city_name = city['city_name']
     mayor_name = city['mayor'] or 'Unknown'
     city_website = city.get('city_website') or ''
     results = {}
     log = []
 
+    def step(desc):
+        if on_step:
+            on_step(desc)
+
     # ── Step 1: Official city website ─────────────────────────────────────────
     if city_website:
         log.append(f'Step 1: City website ({city_website})')
+        step('step 1: city website')
         page_text, resolved_url = find_mayor_page(city_website, city_name, mayor_name)
         time.sleep(FETCH_DELAY)
         if page_text:
@@ -505,6 +510,7 @@ def scrape_city(city):
 
     # ── Step 2: DuckDuckGo web search ─────────────────────────────────────────
     log.append('Step 2: DuckDuckGo search')
+    step('step 2: web search')
     ddg_queries = [
         f'"{mayor_name}" "{city_name}" California email phone contact',
         f'"{mayor_name}" "{city_name}" mayor email',
@@ -567,6 +573,7 @@ def scrape_city(city):
 
     if social_targets:
         log.append('Step 3: Direct social media search')
+        step('step 3: social search')
         for field, query in social_targets:
             time.sleep(DDG_DELAY)
             try:
@@ -669,7 +676,8 @@ def main():
         print('No cities to scrape (all may already be scraped — use --skip-scraped to re-run).')
         return
 
-    print(f'Scraping contact info for {len(cities)} cities...')
+    total = len(cities)
+    print(f'Scraping contact info for {total} cities...')
     print('Results write to DB after each city — safe to interrupt at any time.\n')
 
     stats = {'completed': 0, 'partial': 0, 'failed': 0, 'advanced': 0}
@@ -678,12 +686,19 @@ def main():
         'work_phone': 0, 'personal_phone': 0,
         'instagram': 0, 'facebook': 0,
     }
-    progress = Progress(len(cities), 'Scraping')
+
+    WIDTH = 28  # chars reserved for city name column
 
     for i, city in enumerate(cities):
-        progress.update(i, suffix=city['city_name'])
+        prefix = f'[{i+1:>{len(str(total))}}/{total}]'
+        city_col = city['city_name'][:WIDTH].ljust(WIDTH)
+
+        def on_step(desc, _prefix=prefix, _col=city_col):
+            print(f'\r{_prefix} {_col}  {desc:<30}', end='', flush=True)
+
+        on_step('starting...')
         try:
-            results, log, status = scrape_city(city)
+            results, log, status = scrape_city(city, on_step=on_step)
             advanced = save_results(city['id'], results, log, status)
             stats[status] = stats.get(status, 0) + 1
             if advanced:
@@ -691,16 +706,22 @@ def main():
             for field in field_counts:
                 if results.get(field):
                     field_counts[field] += 1
+
+            found_fields = [f for f in ['work_email', 'personal_email', 'work_phone',
+                                        'personal_phone', 'instagram', 'facebook']
+                            if results.get(f)]
+            result_str = ', '.join(found_fields) if found_fields else 'nothing found'
+            adv_str = ' ↑ advanced' if advanced else ''
+            print(f'\r{prefix} {city_col}  {status}: {result_str}{adv_str}')
+
         except Exception as e:
             save_results(city['id'], {}, [f'Unexpected error: {e}'], 'failed')
             stats['failed'] = stats.get('failed', 0) + 1
+            print(f'\r{prefix} {city_col}  ERROR: {e}')
 
-        if i + 1 < len(cities):
+        if i + 1 < total:
             time.sleep(1)
 
-    progress.done()
-
-    total = len(cities)
     print(f'\n{"=" * 50}')
     print(f'Scrape complete: {total} cities')
     print(f'  Completed: {stats.get("completed", 0)}  '
