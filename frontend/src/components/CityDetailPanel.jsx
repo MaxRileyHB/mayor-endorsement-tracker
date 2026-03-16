@@ -194,10 +194,6 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
             </div>
           )}
 
-          {city.city_blurb && (
-            <p className="text-xs text-gray-400 italic mt-2 leading-relaxed">{city.city_blurb}</p>
-          )}
-
           {/* Action buttons */}
           <div className="flex gap-2 mt-3">
             <select
@@ -295,6 +291,13 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
                   </details>
                 )}
               </div>
+            </section>
+          )}
+
+          {/* City background */}
+          {city.city_blurb && (
+            <section>
+              <p className="text-xs text-gray-400 italic leading-relaxed">{city.city_blurb}</p>
             </section>
           )}
 
