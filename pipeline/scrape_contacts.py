@@ -32,7 +32,7 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 import anthropic
 from sqlalchemy import create_engine, text
 from utils import get_anthropic_client
