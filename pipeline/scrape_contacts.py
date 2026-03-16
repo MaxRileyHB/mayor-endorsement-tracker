@@ -187,16 +187,65 @@ def save_results(city_id, results, log_lines, status):
 # ── Web fetching ───────────────────────────────────────────────────────────────
 
 def fetch_page(url):
-    """Fetch a URL, return (clean_text, resolved_url) or (None, url) on failure."""
+    """
+    Fetch a URL, return (content, resolved_url) or (None, url) on failure.
+
+    Content = visible page text (capped) + a reference block of mailto: links
+    and social media profile links extracted from raw HTML. This ensures
+    emails/social handles that only appear inside <a href="..."> attributes
+    (not as visible text) are still visible to Sonnet.
+    """
     try:
         resp = requests.get(url, headers=HEADERS, timeout=FETCH_TIMEOUT, allow_redirects=True)
         resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, 'html.parser')
+        html = resp.text
+
+        # ── Extract mailto: links before stripping HTML ──────────────────────
+        mailto_entries = []
+        for m in re.finditer(r'<a\s[^>]*href="mailto:([^"]+)"[^>]*>(.*?)</a>',
+                             html, re.IGNORECASE | re.DOTALL):
+            email_addr = m.group(1).strip()
+            link_text = re.sub(r'<[^>]+>', '', m.group(2)).strip()
+            entry = email_addr
+            if link_text and link_text.lower() != email_addr.lower():
+                entry += f' (link text: "{link_text}")'
+            mailto_entries.append(entry)
+
+        # ── Extract social media profile links ───────────────────────────────
+        social_entries = []
+        for m in re.finditer(
+            r'<a\s[^>]*href="(https?://(?:www\.)?'
+            r'(?:instagram|facebook|twitter|x|linkedin)\.com/[^"]+)"[^>]*>(.*?)</a>',
+            html, re.IGNORECASE | re.DOTALL
+        ):
+            social_url = m.group(1).strip()
+            link_text = re.sub(r'<[^>]+>', '', m.group(2)).strip()
+            entry = social_url
+            if link_text:
+                entry += f' (link text: "{link_text}")'
+            social_entries.append(entry)
+
+        # ── Build visible text ───────────────────────────────────────────────
+        soup = BeautifulSoup(html, 'html.parser')
         for tag in soup(['script', 'style', 'noscript']):
             tag.decompose()
-        text = soup.get_text(separator=' ', strip=True)
-        text = re.sub(r'\s+', ' ', text)
-        return text[:MAX_PAGE_CHARS], str(resp.url)
+        visible = soup.get_text(separator=' ', strip=True)
+        visible = re.sub(r'\s+', ' ', visible)[:MAX_PAGE_CHARS]
+
+        # ── Append reference block if anything was found ─────────────────────
+        extra_lines = []
+        if mailto_entries:
+            extra_lines.append('[mailto links found on page]')
+            extra_lines.extend(mailto_entries)
+        if social_entries:
+            extra_lines.append('[social media links found on page]')
+            extra_lines.extend(social_entries)
+
+        content = visible
+        if extra_lines:
+            content += '\n\n' + '\n'.join(extra_lines)
+
+        return content, str(resp.url)
     except Exception:
         return None, url
 
