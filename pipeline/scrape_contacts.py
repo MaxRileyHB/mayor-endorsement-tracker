@@ -87,7 +87,7 @@ PRE_OUTREACH_STATUSES = {'no_contact_info', 'city_contact_only', 'info_requested
 
 # ── Database helpers ───────────────────────────────────────────────────────────
 
-def get_cities(tier=None, city_ids=None, skip_scraped=False, redo_failed=False, limit=None):
+def get_cities(tier=None, city_ids=None, wildfire_risk=None, skip_scraped=False, redo_failed=False, limit=None):
     conditions = []
     params = {}
 
@@ -97,6 +97,9 @@ def get_cities(tier=None, city_ids=None, skip_scraped=False, redo_failed=False, 
     if tier:
         conditions.append('outreach_tier = :tier')
         params['tier'] = tier
+    if wildfire_risk:
+        conditions.append('wildfire_risk_tier = :wildfire_risk')
+        params['wildfire_risk'] = wildfire_risk
 
     if redo_failed:
         conditions.append("contact_scrape_status = 'failed'")
@@ -670,6 +673,8 @@ def main():
                         help='Stop after N cities')
     parser.add_argument('--skip-scraped', action='store_true',
                         help='Skip cities already marked completed or partial')
+    parser.add_argument('--wildfire-risk', choices=['high', 'medium', 'low'],
+                        help='Only scrape cities with this wildfire risk tier')
     parser.add_argument('--redo-failed', action='store_true',
                         help='Only redo cities marked as failed')
     parser.add_argument('--workers', type=int, default=3,
@@ -684,6 +689,7 @@ def main():
     cities = get_cities(
         tier=args.tier,
         city_ids=city_ids,
+        wildfire_risk=args.wildfire_risk,
         skip_scraped=args.skip_scraped,
         redo_failed=args.redo_failed,
         limit=args.limit,
