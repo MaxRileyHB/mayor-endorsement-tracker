@@ -44,6 +44,7 @@ try:
                 WHEN moratorium_active = true THEN 2
                 WHEN is_distressed_county = true AND population >= 15000 THEN 2
                 WHEN has_undermarketed_zips = true THEN 2
+                WHEN wildfire_risk_tier = 'high' THEN 2
                 ELSE 3
               END
         """))
