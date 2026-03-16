@@ -562,13 +562,27 @@ def scrape_city(city, on_step=None):
                 continue
             seen_urls.add(url)
 
-            time.sleep(FETCH_DELAY)
-            page_text, resolved = fetch_page(url)
-            if not page_text:
+            # Always capture the DDG snippet — it often contains emails from PDFs
+            # or pages we can't otherwise parse
+            snippet_text = '\n'.join(filter(None, [r.get('title', ''), r.get('body', '')]))
+
+            if url.lower().endswith('.pdf'):
+                # Don't try to fetch PDFs — use the snippet alone
+                content, resolved = snippet_text, url
+            else:
+                time.sleep(FETCH_DELAY)
+                page_text, resolved = fetch_page(url)
+                # Prepend page content, append snippet as fallback context
+                if page_text:
+                    content = page_text + '\n\n[search snippet]\n' + snippet_text
+                else:
+                    content = snippet_text  # snippet is better than nothing
+
+            if not content.strip():
                 continue
 
             extracted, notes = sonnet_extract_search_result(
-                page_text, mayor_name, city_name, resolved
+                content, mayor_name, city_name, resolved
             )
             if extracted:
                 results = merge(results, extracted)
@@ -637,6 +651,62 @@ def scrape_city(city, on_step=None):
                             break
     else:
         log.append('Step 3: Skipped — Instagram and Facebook already found')
+
+    # ── Step 3b: Targeted email search if still no email ──────────────────────
+    if not results.get('work_email') and not results.get('personal_email'):
+        step('step 3b: email search')
+        log.append('Step 3b: Targeted email search (no email found yet)')
+        email_queries = [
+            f'"{mayor_name}" {city_name} California mayor email',
+            f'"{mayor_name}" {city_name} "@" contact',
+        ]
+        for query in email_queries:
+            if results.get('work_email') or results.get('personal_email'):
+                break
+            with DDG_LOCK:
+                time.sleep(DDG_DELAY)
+                try:
+                    ddg_results = list(DDGS().text(query, max_results=8))
+                except Exception as e:
+                    log.append(f'  DDG error: {e}')
+                    continue
+
+            log.append(f'  "{query[:70]}" → {len(ddg_results)} results')
+            for r in ddg_results:
+                url = r.get('href', '')
+                if not url or url in seen_urls:
+                    continue
+                domain = urlparse(url).netloc.lower().lstrip('www.')
+                if any(domain.endswith(s) for s in SKIP_DOMAINS):
+                    continue
+                seen_urls.add(url)
+
+                snippet_text = '\n'.join(filter(None, [r.get('title', ''), r.get('body', '')]))
+
+                # Quick regex scan of snippet for email addresses before fetching
+                quick_emails = re.findall(r'[\w.+-]+@[\w-]+\.[\w.]+', snippet_text)
+                if quick_emails:
+                    log.append(f'  Snippet email hit on {domain}: {quick_emails[0]}')
+
+                if url.lower().endswith('.pdf'):
+                    content, resolved = snippet_text, url
+                else:
+                    time.sleep(FETCH_DELAY)
+                    page_text, resolved = fetch_page(url)
+                    content = (page_text + '\n\n[search snippet]\n' + snippet_text) if page_text else snippet_text
+
+                if not content.strip():
+                    continue
+
+                extracted, notes = sonnet_extract_search_result(
+                    content, mayor_name, city_name, resolved
+                )
+                if extracted:
+                    results = merge(results, extracted)
+                    found = [k for k in ['work_email', 'personal_email'] if extracted.get(k)]
+                    if found:
+                        log.append(f'    {domain}: found {", ".join(found)}')
+                        break  # got an email — stop scanning results for this query
 
     # ── Step 4: Determine status ───────────────────────────────────────────────
     found_fields = [
