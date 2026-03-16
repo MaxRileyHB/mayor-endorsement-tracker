@@ -87,7 +87,8 @@ PRE_OUTREACH_STATUSES = {'no_contact_info', 'city_contact_only', 'info_requested
 
 # ── Database helpers ───────────────────────────────────────────────────────────
 
-def get_cities(tier=None, city_ids=None, wildfire_risk=None, skip_scraped=False, redo_failed=False, limit=None):
+def get_cities(tier=None, city_ids=None, wildfire_risk=None, skip_scraped=False,
+               redo_failed=False, missing_email=False, limit=None):
     conditions = []
     params = {}
 
@@ -103,6 +104,15 @@ def get_cities(tier=None, city_ids=None, wildfire_risk=None, skip_scraped=False,
 
     if redo_failed:
         conditions.append("contact_scrape_status = 'failed'")
+    elif missing_email:
+        # Already scraped but no email found — worth retrying
+        conditions.append("contact_scrape_status IN ('completed', 'partial')")
+        conditions.append(
+            "(mayor_work_email IS NULL OR mayor_work_email = '')"
+        )
+        conditions.append(
+            "(mayor_personal_email IS NULL OR mayor_personal_email = '')"
+        )
     elif skip_scraped:
         conditions.append("contact_scrape_status NOT IN ('completed', 'partial')")
     else:
@@ -346,8 +356,10 @@ PHONE NUMBERS — look for any number labeled as the mayor's direct line, \
 cell, or office. If the only number on the page is the general city hall line \
 but it's the only way to reach the mayor, capture it anyway and note it in work_phone.
 
-SOCIAL MEDIA — look for profile links, icons with href attributes, \
-"Follow us" sections, bio pages. Capture Instagram, Facebook, Twitter/X, LinkedIn.
+SOCIAL MEDIA — look for profile links, icons with href attributes, bio pages. \
+IMPORTANT: return ONLY the mayor's personal or campaign accounts (e.g., @MayorJohnSmith, \
+@johnsmithforcouncil). Do NOT return official city government accounts \
+(e.g., @CityOfAdelanto, @AdelantoGov). We need the mayor as a person, not the city.
 
 Return ONLY valid JSON:
 {{
@@ -421,7 +433,10 @@ don't skip it just because you're not 100% sure.
 PHONE NUMBERS — capture any number that could be this mayor's direct line, \
 cell, campaign phone, or city office. If you see a number near their name, capture it.
 
-SOCIAL MEDIA — Instagram, Facebook, Twitter/X, LinkedIn handles or profile URLs.
+SOCIAL MEDIA — Instagram, Facebook, Twitter/X, LinkedIn handles or profile URLs. \
+IMPORTANT: return ONLY the mayor's personal or campaign accounts \
+(e.g., @MayorJohnSmith, @johnsmithforcouncil). Do NOT return official city government \
+accounts (e.g., @CityOfAdelanto, @AdelantoGov). We need the person, not the institution.
 
 IDENTITY CHECK — many people share names. Before returning anything, confirm \
 the content is about this specific person (e.g., mentions {city_name}, "mayor", \
@@ -774,6 +789,8 @@ def main():
                         help='Only scrape cities with this wildfire risk tier')
     parser.add_argument('--redo-failed', action='store_true',
                         help='Only redo cities marked as failed')
+    parser.add_argument('--missing-email', action='store_true',
+                        help='Redo already-scraped cities that have no email address yet')
     parser.add_argument('--workers', type=int, default=3,
                         help='Parallel workers (default 3; use 1 for sequential)')
     args = parser.parse_args()
@@ -789,6 +806,7 @@ def main():
         wildfire_risk=args.wildfire_risk,
         skip_scraped=args.skip_scraped,
         redo_failed=args.redo_failed,
+        missing_email=args.missing_email,
         limit=args.limit,
     )
 
