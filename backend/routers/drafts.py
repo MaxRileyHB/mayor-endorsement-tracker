@@ -114,7 +114,8 @@ def assign_email_tier(city) -> int:
         (city.population and city.population >= 30000) or
         (city.fair_plan_policies and city.fair_plan_policies >= 1000) or
         city.moratorium_active or
-        (city.is_distressed_county and city.population and city.population >= 15000)
+        (city.is_distressed_county and city.population and city.population >= 15000) or
+        city.has_undermarketed_zips
     ):
         return 2
     return 3
