@@ -451,10 +451,11 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
           <section>
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Officials</h3>
             <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Mayor</span>
-                <span className="text-gray-900 font-medium">{city.mayor || '—'}</span>
-              </div>
+              <MayorField
+                value={city.mayor}
+                flagged={city.mayor_needs_verification}
+                onSave={name => save({ mayor: name, mayor_needs_verification: false })}
+              />
               {city.mayor_pro_tem && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Mayor Pro Tem</span>
@@ -849,6 +850,52 @@ function Spinner() {
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
     </svg>
+  )
+}
+
+function MayorField({ value, flagged, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(value || '')
+
+  const commit = () => {
+    const trimmed = val.trim()
+    if (trimmed && trimmed !== value) onSave(trimmed)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex justify-between items-center">
+        <span className="text-gray-500">Mayor</span>
+        <input
+          autoFocus
+          type="text"
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+          className="text-sm border border-blue-300 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400 w-48"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex justify-between items-center group">
+      <span className="text-gray-500">Mayor</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-gray-900 font-medium">{value || '—'}</span>
+        <button
+          onClick={() => { setVal(value || ''); setEditing(true) }}
+          className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-blue-500 transition-opacity"
+          title="Edit mayor"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
+          </svg>
+        </button>
+      </div>
+    </div>
   )
 }
 
