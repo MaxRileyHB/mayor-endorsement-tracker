@@ -3,11 +3,32 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from typing import Optional, List
 from datetime import datetime
+import os
 
 import sys
 sys.path.append("..")
 from database import get_db
 from models import City, ActivityLog, Email, CallLog
+
+
+def derive_last_name(full_name: str) -> str | None:
+    """Ask Haiku to extract the last name from a mayor's full name."""
+    if not full_name or not full_name.strip():
+        return None
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=20,
+            messages=[{
+                "role": "user",
+                "content": f"What is the last name of this person: {full_name}\n\nReply with the last name only, nothing else."
+            }]
+        )
+        return response.content[0].text.strip()
+    except Exception:
+        return None
 
 # Statuses where a "responded" flag is no longer relevant — city has been actioned
 RESPONDED_CLEAR_STATUSES = {
@@ -155,7 +176,13 @@ def update_city(city_id: int, update: CityUpdate, db: Session = Depends(get_db))
     old_status = city.outreach_status
     changes = []
 
-    for field, value in update.model_dump(exclude_unset=True).items():
+    patch = update.model_dump(exclude_unset=True)
+
+    # Auto-derive last name whenever mayor name changes
+    if "mayor" in patch and patch["mayor"] != city.mayor:
+        patch["mayor_last_name"] = derive_last_name(patch["mayor"])
+
+    for field, value in patch.items():
         if getattr(city, field) != value:
             changes.append(f"{field}: {getattr(city, field)} -> {value}")
             setattr(city, field, value)

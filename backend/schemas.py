@@ -8,6 +8,7 @@ class CityBase(BaseModel):
     county: Optional[str] = None
     population: Optional[int] = None
     mayor: Optional[str] = None
+    mayor_last_name: Optional[str] = None
     mayor_pro_tem: Optional[str] = None
     previous_mayor: Optional[str] = None
     mayor_needs_verification: Optional[bool] = False

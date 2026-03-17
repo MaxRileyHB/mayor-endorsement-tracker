@@ -14,6 +14,7 @@ class City(Base):
 
     # Officials
     mayor = Column(String(255))
+    mayor_last_name = Column(String(255))
     mayor_pro_tem = Column(String(255))
     previous_mayor = Column(String(255))
     mayor_needs_verification = Column(Boolean, default=False)

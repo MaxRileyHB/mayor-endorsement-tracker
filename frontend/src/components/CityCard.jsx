@@ -2,19 +2,17 @@ import { TIER_COLORS, STATUS_MAP } from '../constants'
 
 function contactCompleteness(city) {
   const hasEmail = city.mayor_work_email || city.mayor_personal_email
-  const hasPhone = city.mayor_work_phone || city.mayor_personal_phone
-  const hasSocial = city.mayor_instagram || city.mayor_facebook || city.mayor_other_social_handle
-  if (hasEmail && (hasPhone || hasSocial)) return 'strong'
-  if (hasEmail || hasPhone || hasSocial) return 'partial'
-  if (city.city_email || city.city_phone) return 'minimal'
-  return 'none'
+  const hasOtherMayor = city.mayor_work_phone || city.mayor_personal_phone ||
+    city.mayor_instagram || city.mayor_facebook || city.mayor_other_social_handle
+  if (hasEmail) return 'green'
+  if (hasOtherMayor) return 'yellow'
+  return 'red'
 }
 
 const COMPLETENESS_DOT = {
-  strong:  { color: 'bg-green-400',  title: 'Mayor contact: email + phone/social' },
-  partial: { color: 'bg-yellow-400', title: 'Mayor contact: partial (email or phone/social)' },
-  minimal: { color: 'bg-red-400',    title: 'City contact only — no mayor direct info' },
-  none:    { color: 'bg-gray-300',   title: 'No contact info at all' },
+  green:  { color: 'bg-green-400',  title: 'Mayor contact: work or personal email on file' },
+  yellow: { color: 'bg-yellow-400', title: 'Mayor contact: phone or social only — no email' },
+  red:    { color: 'bg-red-400',    title: 'No mayor-specific contact info' },
 }
 
 export default function CityCard({ city, onClick, selected, onSelect, hasUnread = false }) {

@@ -34,6 +34,7 @@ try:
         _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS contact_scrape_date TIMESTAMP"))
         _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS contact_scrape_log TEXT"))
         _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS city_blurb TEXT"))
+        _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS mayor_last_name VARCHAR(255)"))
         # Recompute outreach_tier using the algorithmic email tier system
         _conn.execute(text("""
             UPDATE cities SET outreach_tier =
