@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Draft, City, Email, ActivityLog
 import gmail_client
+from sheets_sync import schedule_sync
 
 router = APIRouter(prefix="/api", tags=["emails"])
 
@@ -148,6 +149,8 @@ def send_drafts(payload: SendRequest, db: Session = Depends(get_db)):
             failed.append({"draft_id": draft.id, "error": str(e)})
 
     db.commit()
+    if sent:
+        schedule_sync()
     return {"sent": len(sent), "draft_ids": sent, "failed": failed}
 
 

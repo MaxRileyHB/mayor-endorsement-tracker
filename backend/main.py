@@ -62,11 +62,39 @@ try:
             WHERE mayor_phone IS NOT NULL AND mayor_phone != ''
               AND (mayor_work_phone IS NULL OR mayor_work_phone = '')
         """))
+        _conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS mail_merge_templates ("
+            "  id SERIAL PRIMARY KEY,"
+            "  name VARCHAR(255) NOT NULL,"
+            "  subject_template TEXT NOT NULL,"
+            "  body_template TEXT NOT NULL,"
+            "  created_at TIMESTAMP DEFAULT NOW(),"
+            "  updated_at TIMESTAMP DEFAULT NOW()"
+            ")"
+        ))
+        _conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS mail_merge_jobs ("
+            "  id VARCHAR(50) PRIMARY KEY,"
+            "  template_id INTEGER,"
+            "  status VARCHAR(20) DEFAULT 'running',"
+            "  total INTEGER DEFAULT 0,"
+            "  sent INTEGER DEFAULT 0,"
+            "  skipped INTEGER DEFAULT 0,"
+            "  failed INTEGER DEFAULT 0,"
+            "  current_city VARCHAR(255),"
+            "  stagger_seconds INTEGER DEFAULT 30,"
+            "  city_plan JSONB,"
+            "  skipped_cities JSONB,"
+            "  created_at TIMESTAMP DEFAULT NOW(),"
+            "  completed_at TIMESTAMP"
+            ")"
+        ))
         _conn.commit()
 except Exception as _e:
     print(f"Migration warning (non-fatal): {_e}")
 
 from routers import cities, drafts, auth, emails
+from routers import mail_merge
 
 app = FastAPI(title="Mayor CRM API")
 
@@ -81,6 +109,7 @@ app.include_router(cities.router)
 app.include_router(drafts.router)
 app.include_router(auth.router)
 app.include_router(emails.router)
+app.include_router(mail_merge.router)
 
 
 @app.get("/health")

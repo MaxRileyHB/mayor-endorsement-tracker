@@ -4,6 +4,7 @@ import KanbanBoard from './components/KanbanBoard'
 import TableView from './components/TableView'
 import CityDetailPanel from './components/CityDetailPanel'
 import ReviewQueue from './components/ReviewQueue'
+import MailMerge from './components/MailMerge'
 import MultiSelectDropdown from './components/MultiSelectDropdown'
 import { SkeletonKanban, SkeletonTableRows } from './components/Skeleton'
 import { STATUSES } from './constants'
@@ -20,6 +21,57 @@ const EMPTY_FILTERS = {
   is_distressed_county: '',
   has_undermarketed_zips: '',
   needs_verification: '',
+}
+
+const PIPELINE_SEGMENTS = [
+  { key: 'no_contact_info',    color: 'bg-gray-300',   label: 'No contact info' },
+  { key: 'city_contact_only',  color: 'bg-gray-400',   label: 'City contact only' },
+  { key: 'info_requested',     color: 'bg-amber-300',  label: 'Info requested' },
+  { key: 'ready_for_outreach', color: 'bg-blue-300',   label: 'Ready for outreach' },
+  { key: 'outreach_sent',      color: 'bg-blue-500',   label: 'Outreach sent' },
+  { key: 'in_conversation',    color: 'bg-violet-400', label: 'In conversation' },
+  { key: 'call_scheduled',     color: 'bg-violet-600', label: 'Call scheduled' },
+  { key: 'endorsed',           color: 'bg-green-500',  label: 'Endorsed' },
+  { key: 'declined',           color: 'bg-red-400',    label: 'Declined' },
+  { key: 'follow_up',          color: 'bg-amber-400',  label: 'Follow-up needed' },
+  { key: 'not_pursuing',       color: 'bg-gray-200',   label: 'Not pursuing' },
+]
+
+function PipelineBar({ stats }) {
+  if (!stats) return null
+  const total = stats.total || 1
+  const byStatus = stats.by_status || {}
+
+  const endorsed   = byStatus.endorsed || 0
+  const active     = (byStatus.outreach_sent || 0) + (byStatus.in_conversation || 0) + (byStatus.call_scheduled || 0)
+  const noContact  = (byStatus.no_contact_info || 0) + (byStatus.city_contact_only || 0)
+  const declined   = byStatus.declined || 0
+
+  return (
+    <div className="bg-white border-b border-gray-100 px-4 py-2 shrink-0">
+      <div className="flex items-center gap-5 mb-1.5 text-xs">
+        <span className="text-gray-400">{total} cities total</span>
+        <span className="font-medium text-green-700">{endorsed} endorsed</span>
+        <span className="text-violet-700">{active} active in pipeline</span>
+        <span className="text-gray-400">{noContact} not yet contacted</span>
+        {declined > 0 && <span className="text-red-500">{declined} declined</span>}
+      </div>
+      <div className="flex h-2 rounded-full overflow-hidden gap-[1px] bg-gray-100">
+        {PIPELINE_SEGMENTS.map(seg => {
+          const count = byStatus[seg.key] || 0
+          if (!count) return null
+          return (
+            <div
+              key={seg.key}
+              className={`${seg.color} h-full transition-all`}
+              style={{ width: `${(count / total) * 100}%` }}
+              title={`${seg.label}: ${count}`}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 const Spinner = () => (
@@ -61,6 +113,7 @@ export default function App() {
   const [fetching, setFetching] = useState(false)
   const [reviewBatchId, setReviewBatchId] = useState(null)
   const [reviewCityCount, setReviewCityCount] = useState(0)
+  const [mailMergeInitialCityIds, setMailMergeInitialCityIds] = useState([])
   const [generating, setGenerating] = useState(false)
   const [gmailStatus, setGmailStatus] = useState(null)
   const [syncing, setSyncing] = useState(false)
@@ -195,9 +248,7 @@ export default function App() {
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shrink-0">
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-gray-900">Mayor Endorsement Tracker</h1>
-          <p className="text-xs text-gray-400">
-            {stats?.total || '—'} cities · {contacted} contacted · {endorsed} endorsed
-          </p>
+          <p className="text-xs text-gray-400">Ben Allen for Insurance Commissioner</p>
         </div>
 
         <input
@@ -260,8 +311,14 @@ export default function App() {
             className={`px-3 py-1.5 ${view === 'review' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             onClick={() => { setView('review'); setReviewBatchId(null) }}
           >Drafts</button>
+          <button
+            className={`px-3 py-1.5 ${view === 'mail-merge' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            onClick={() => { setView('mail-merge'); setMailMergeInitialCityIds([]) }}
+          >Mail Merge</button>
         </div>
       </header>
+
+      <PipelineBar stats={stats} />
 
       {/* Filter panel */}
       {showFilters && (
@@ -378,8 +435,13 @@ export default function App() {
         </div>
       )}
 
-      <main className={`flex-1 overflow-hidden px-4 py-3 transition-opacity duration-150 ${fetching && !loading ? 'opacity-60 pointer-events-none' : ''}`}>
-        {view === 'review' ? (
+      <main className={`flex-1 overflow-hidden transition-opacity duration-150 ${view !== 'mail-merge' ? 'px-4 py-3' : ''} ${fetching && !loading ? 'opacity-60 pointer-events-none' : ''}`}>
+        {view === 'mail-merge' ? (
+          <MailMerge
+            initialCityIds={mailMergeInitialCityIds}
+            onBack={() => setView('kanban')}
+          />
+        ) : view === 'review' ? (
           <ReviewQueue
             batchId={reviewBatchId}
             expectedCount={reviewCityCount}
@@ -435,6 +497,16 @@ export default function App() {
             </button>
           )}
           <div className="flex gap-2 ml-auto">
+            <button
+              onClick={() => {
+                setMailMergeInitialCityIds([...selected])
+                setSelected(new Set())
+                setView('mail-merge')
+              }}
+              className="bg-violet-600 hover:bg-violet-500 text-sm px-3 py-1.5 rounded"
+            >
+              Mail Merge
+            </button>
             <button
               disabled={generating}
               onClick={() => handleGenerateDrafts('info_request')}

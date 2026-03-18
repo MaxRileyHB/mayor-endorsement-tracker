@@ -149,3 +149,32 @@ class ActivityLog(Base):
     action = Column(String(100))
     details = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class MailMergeTemplate(Base):
+    __tablename__ = "mail_merge_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    subject_template = Column(Text, nullable=False)
+    body_template = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class MailMergeJob(Base):
+    __tablename__ = "mail_merge_jobs"
+
+    id = Column(String(50), primary_key=True)
+    template_id = Column(Integer)
+    status = Column(String(20), default="running")   # running, paused, completed, cancelled
+    total = Column(Integer, default=0)
+    sent = Column(Integer, default=0)
+    skipped = Column(Integer, default=0)
+    failed = Column(Integer, default=0)
+    current_city = Column(String(255))
+    stagger_seconds = Column(Integer, default=30)
+    city_plan = Column(JSONB)       # [{city_id, city_name, mayor_name, to_email, email_source}]
+    skipped_cities = Column(JSONB)  # [{city_id, city_name, reason}]
+    created_at = Column(DateTime, server_default=func.now())
+    completed_at = Column(DateTime)

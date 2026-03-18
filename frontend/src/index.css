@@ -11,3 +11,20 @@ body { margin: 0; }
 .loading-bar {
   animation: loading-bar 1.2s ease-in-out infinite;
 }
+
+/* TipTap editor */
+.tiptap-body .ProseMirror {
+  min-height: 220px;
+  outline: none;
+  padding: 0;
+}
+.tiptap-body .ProseMirror p { margin: 0 0 0.6em 0; }
+.tiptap-body .ProseMirror p:last-child { margin-bottom: 0; }
+.tiptap-body .ProseMirror a { color: #2563eb; text-decoration: underline; }
+.tiptap-body .ProseMirror strong { font-weight: 600; }
+
+.tiptap-subject .ProseMirror {
+  outline: none;
+  white-space: nowrap;
+  overflow: hidden;
+}

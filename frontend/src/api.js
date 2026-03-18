@@ -37,3 +37,22 @@ export const sendDrafts = (draft_ids) => api.post('/drafts/send', { draft_ids })
 export const syncEmails = () => api.post('/emails/sync').then(r => r.data)
 export const getUnreadCities = () => api.get('/emails/unread-cities').then(r => r.data)
 export const markEmailsRead = (cityId) => api.post(`/emails/city/${cityId}/read`).then(r => r.data)
+
+// Mail merge
+export const mmListTemplates = () => api.get('/mail-merge/templates').then(r => r.data)
+export const mmCreateTemplate = (data) => api.post('/mail-merge/templates', data).then(r => r.data)
+export const mmUpdateTemplate = (id, data) => api.patch(`/mail-merge/templates/${id}`, data).then(r => r.data)
+export const mmDeleteTemplate = (id) => api.delete(`/mail-merge/templates/${id}`).then(r => r.data)
+export const mmListTags = () => api.get('/mail-merge/tags').then(r => r.data)
+export const mmCount = (filters, email_priority) =>
+  api.post('/mail-merge/count', { filters, email_priority }).then(r => r.data)
+export const mmPreview = (template_id, filters, email_priority, count = 5) =>
+  api.post('/mail-merge/preview', { template_id, filters, email_priority, count }).then(r => r.data)
+export const mmTest = (template_id, city_id, test_email) =>
+  api.post('/mail-merge/test', { template_id, city_id, test_email }).then(r => r.data)
+export const mmSend = (template_id, filters, email_priority, stagger_rate) =>
+  api.post('/mail-merge/send', { template_id, filters, email_priority, stagger_rate }).then(r => r.data)
+export const mmJobStatus = (job_id) => api.get(`/mail-merge/send/${job_id}`).then(r => r.data)
+export const mmJobPause = (job_id) => api.post(`/mail-merge/send/${job_id}/pause`).then(r => r.data)
+export const mmJobResume = (job_id) => api.post(`/mail-merge/send/${job_id}/resume`).then(r => r.data)
+export const mmJobCancel = (job_id) => api.post(`/mail-merge/send/${job_id}/cancel`).then(r => r.data)

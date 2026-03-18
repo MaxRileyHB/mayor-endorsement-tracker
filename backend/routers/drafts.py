@@ -20,18 +20,30 @@ def _get_anthropic():
 
 
 def fetch_wikipedia_blurb(city_name: str) -> str:
-    import re, requests
+    import requests
     title = f"{city_name}, California"
     url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{requests.utils.quote(title)}"
     try:
         r = requests.get(url, timeout=5, headers={"User-Agent": "MayorEndorsementTracker/1.0"})
-        if r.status_code == 200:
-            extract = r.json().get("extract", "")
-            sentences = re.split(r'(?<=[.!?])\s+', extract.strip())
-            return " ".join(sentences[:2])
+        if r.status_code != 200:
+            return ""
+        extract = r.json().get("extract", "").strip()
+        if not extract:
+            return ""
+
+        client = get_anthropic_client()
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=100,
+            messages=[{"role": "user", "content": f"""Here is the Wikipedia summary for {city_name}, California:
+
+{extract[:1500]}
+
+Write 1-2 sentences (max 40 words) capturing what this city is like — its geography, character, history, economy, or what it's known for. Skip population figures and census data. Output only the sentences."""}]
+        )
+        return response.content[0].text.strip()
     except Exception:
-        pass
-    return ""
+        return ""
 
 
 INFO_REQUEST_SYSTEM = """You are writing a brief, professional email from Max Riley, State Senator Ben Allen's campaign for California Insurance Commissioner, to a city's general inbox requesting the mayor's direct contact info.

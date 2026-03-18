@@ -36,6 +36,7 @@ RESPONDED_CLEAR_STATUSES = {
     "call_scheduled", "endorsed", "declined", "follow_up", "not_pursuing",
 }
 from schemas import CityRead, CityUpdate, CityBase, BatchUpdate, StatsResponse, EmailRead, CallLogRead, CallLogCreate
+from sheets_sync import schedule_sync
 
 router = APIRouter(prefix="/api/cities", tags=["cities"])
 
@@ -204,6 +205,7 @@ def update_city(city_id: int, update: CityUpdate, db: Session = Depends(get_db))
 
     db.commit()
     db.refresh(city)
+    schedule_sync()
     return city
 
 
@@ -230,6 +232,7 @@ def batch_update(payload: BatchUpdate, db: Session = Depends(get_db)):
         updated += 1
 
     db.commit()
+    schedule_sync()
     return {"updated": updated}
 
 
