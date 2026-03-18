@@ -456,6 +456,13 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
                 flagged={city.mayor_needs_verification}
                 onSave={name => save({ mayor: name, mayor_needs_verification: false })}
               />
+              <ContactField
+                label="Last Name"
+                value={city.mayor_last_name}
+                editable
+                onSave={v => save({ mayor_last_name: v || null })}
+                wasSearched={false}
+              />
               {city.mayor_pro_tem && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Mayor Pro Tem</span>

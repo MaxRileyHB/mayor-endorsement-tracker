@@ -318,7 +318,7 @@ export default function App() {
         </div>
       </header>
 
-      <PipelineBar stats={stats} />
+      {(view === 'kanban' || view === 'table') && <PipelineBar stats={stats} />}
 
       {/* Filter panel */}
       {showFilters && (
