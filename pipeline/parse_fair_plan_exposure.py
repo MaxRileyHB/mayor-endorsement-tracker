@@ -50,6 +50,12 @@ def try_pymupdf_text():
             print(f"  Page {i+1} preview:\n{text[:600]}\n---")
     doc.close()
     print(f"  Extracted {len(pages_text)} pages")
+
+    raw_out = OUTPUT_DIR / "fair_plan_exposure_raw_text.json"
+    with open(raw_out, "w", encoding="utf-8") as f:
+        json.dump(pages_text, f, indent=2, ensure_ascii=False)
+    print(f"  Raw text saved -> {raw_out}")
+
     return pages_text
 
 def parse_pages_with_sonnet(pages_text):

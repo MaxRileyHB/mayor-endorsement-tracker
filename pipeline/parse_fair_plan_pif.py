@@ -37,26 +37,38 @@ def try_tabula():
         print(f"  tabula failed: {e}")
         return None
 
-def try_pymupdf_text():
-    print("Trying PyMuPDF text extraction...")
+def try_pymupdf_pages():
+    print("Trying PyMuPDF text extraction (page by page)...")
     doc = fitz.open(str(PDF_PATH))
     pages_text = []
     for i, page in enumerate(doc):
         text = page.get_text()
         pages_text.append(text)
-        if i < 2:
+        if i < 1:
             print(f"  Page {i+1} preview:\n{text[:500]}\n---")
     doc.close()
-    return "\n".join(pages_text)
+    print(f"  Extracted {len(pages_text)} pages")
 
-def parse_with_sonnet(raw_text):
-    print("Using Sonnet API for extraction...")
+    raw_out = OUTPUT_DIR / "fair_plan_pif_raw_text.json"
+    with open(raw_out, "w", encoding="utf-8") as f:
+        json.dump(pages_text, f, indent=2, ensure_ascii=False)
+    print(f"  Raw text saved -> {raw_out}")
+
+    return pages_text
+
+def parse_pages_with_sonnet(pages_text):
+    """Send each PDF page to Sonnet individually and aggregate results."""
+    import time
     client = get_anthropic_client()
+    all_rows = []
 
-    prompt = f"""This is text extracted from a FAIR Plan (California FAIR Plan Association) PDF report showing
-Residential Policies in Force (PIF) by ZIP code. It likely has multiple years of data (5-year trend).
+    print(f"  Sending {len(pages_text)} pages to Sonnet (1 page/call)...")
 
-Extract ALL rows as a JSON array. Each row should be:
+    for page_num, page_text in enumerate(pages_text):
+        prompt = f"""This is one page from a California FAIR Plan Residential Policies in Force (PIF) report by ZIP code.
+It has 5 years of policy count data.
+
+Extract every ZIP code data row from this page. For each, return:
 {{
   "zip": "90001",
   "county": "Los Angeles",
@@ -67,24 +79,46 @@ Extract ALL rows as a JSON array. Each row should be:
   "policies_fy21": 700
 }}
 
-Include only rows where zip is a valid 5-digit number. Use null for missing year values.
-Return ONLY the JSON array, no explanation.
+Rules:
+- zip: valid 5-digit string
+- county: county name if visible on this page (may be a section header), else null
+- policies_fy*: integer policy counts, null if missing
+- Skip header rows, total/subtotal rows, page title rows
+- Return ONLY a JSON array, no explanation, no code fences
 
-Document text:
+Page text:
 ---
-{raw_text[:40000]}
+{page_text}
 ---"""
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=8096,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    text = response.content[0].text.strip()
-    # Strip code fences if present
-    text = re.sub(r'^```(?:json)?\s*', '', text)
-    text = re.sub(r'\s*```$', '', text)
-    return json.loads(text)
+        for attempt in range(3):
+            try:
+                response = client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=8192,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                text = response.content[0].text.strip()
+                text = re.sub(r'^```(?:json)?\s*', '', text)
+                text = re.sub(r'\s*```$', '', text)
+                page_rows = json.loads(text)
+                print(f"  Page {page_num+1}/{len(pages_text)}: {len(page_rows)} rows")
+                all_rows.extend(page_rows)
+                time.sleep(3)
+                break
+            except json.JSONDecodeError as e:
+                print(f"  Page {page_num+1} JSON error: {e} — skipping")
+                break
+            except Exception as e:
+                if "rate_limit" in str(e).lower():
+                    wait = 30 * (attempt + 1)
+                    print(f"  Rate limit hit — waiting {wait}s...")
+                    time.sleep(wait)
+                else:
+                    print(f"  Page {page_num+1} error: {e} — skipping")
+                    break
+
+    return all_rows
 
 def normalize_tabula_results(dfs):
     """Try to find the ZIP/policy data in tabula output."""
@@ -157,20 +191,34 @@ def extract_county_from_text(raw_text):
 if __name__ == "__main__":
     rows = None
 
-    # Strategy 1: tabula
-    dfs = try_tabula()
-    if dfs:
-        rows = normalize_tabula_results(dfs)
-        print(f"tabula extracted {len(rows)} ZIP rows")
+    # tabula only captures ~850 rows on this PDF regardless of settings — skip it
+    if False:
+        dfs = try_tabula()
+        if dfs:
+            rows = normalize_tabula_results(dfs)
+            print(f"tabula extracted {len(rows)} ZIP rows")
 
-    # Strategy 2: PyMuPDF + Sonnet
+    # PyMuPDF + Sonnet (page by page)
     if not rows or len(rows) < 50:
-        print("tabula insufficient, falling back to PyMuPDF + Sonnet...")
-        raw_text = try_pymupdf_text()
-        rows = parse_with_sonnet(raw_text)
-        print(f"Sonnet extracted {len(rows)} ZIP rows")
+        print("tabula insufficient, falling back to PyMuPDF + Sonnet (page by page)...")
+        pages_text = try_pymupdf_pages()
+        rows = parse_pages_with_sonnet(pages_text)
+        print(f"Sonnet extracted {len(rows)} ZIP rows total")
 
-    print(f"\nTotal: {len(rows)} ZIP records")
+    # Deduplicate by ZIP (keep highest policies_fy25 entry)
+    by_zip = {}
+    for row in rows:
+        z = row.get("zip")
+        if not z:
+            continue
+        existing = by_zip.get(z)
+        if not existing or (row.get("policies_fy25") or 0) > (existing.get("policies_fy25") or 0):
+            by_zip[z] = row
+    rows = list(by_zip.values())
+
+    total = sum((r.get("policies_fy25") or 0) for r in rows)
+    print(f"\nTotal: {len(rows)} unique ZIP records")
+    print(f"Total policies_fy25: {total:,}")
     print("Sample:", json.dumps(rows[:3], indent=2))
 
     out = OUTPUT_DIR / "fair_plan_pif.json"

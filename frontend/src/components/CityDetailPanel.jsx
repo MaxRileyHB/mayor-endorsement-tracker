@@ -955,9 +955,9 @@ function ContactField({ label, value, link, editable, onSave, sourceUrl, wasSear
           )}
         </span>
       ) : editable ? (
-        wasSearched
-          ? <span className="text-gray-300 italic">Not found</span>
-          : <button onClick={() => setEditing(true)} className="text-blue-500 hover:underline italic">Add...</button>
+        <button onClick={() => setEditing(true)} className={`italic hover:underline ${wasSearched ? 'text-gray-300 hover:text-blue-500' : 'text-blue-500'}`}>
+          {wasSearched ? 'Not found' : 'Add...'}
+        </button>
       ) : null}
     </div>
   )
