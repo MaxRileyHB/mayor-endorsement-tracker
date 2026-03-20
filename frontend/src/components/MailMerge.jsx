@@ -273,7 +273,7 @@ function Step1Template({ state, setState, onNext }) {
     }
   }
 
-  const canNext = state.subject.trim() && state.bodyHtml && state.bodyHtml !== '<p></p>'
+  const canNext = state.selectedTemplateId && state.subject.trim() && state.bodyHtml && state.bodyHtml !== '<p></p>'
 
   // Subject tag insertion helper
   const subjectRef = useRef(null)
@@ -402,7 +402,10 @@ function Step1Template({ state, setState, onNext }) {
         )}
       </div>
 
-      <div className="flex justify-end pt-2">
+      <div className="flex items-center justify-end gap-3 pt-2">
+        {state.subject.trim() && state.bodyHtml && state.bodyHtml !== '<p></p>' && !state.selectedTemplateId && (
+          <span className="text-xs text-amber-600">Save the template first to continue</span>
+        )}
         <button
           onClick={onNext}
           disabled={!canNext}
@@ -863,7 +866,8 @@ function Step3Preview({ state, setState, onBack, onNext }) {
         setTestCity(data.previews[0].city_id)
       }
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to generate preview')
+      const detail = e.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Failed to generate preview')
     } finally {
       setLoading(false)
     }
