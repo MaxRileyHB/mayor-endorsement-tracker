@@ -13,6 +13,7 @@ import {
 
 const AVAILABLE_TAGS = [
   { key: 'mayor_first_name', label: 'Mayor first name',  example: 'John' },
+  { key: 'mayor_last_name',  label: 'Mayor last name',   example: 'Smith' },
   { key: 'mayor_full_name',  label: 'Mayor full name',   example: 'John Smith' },
   { key: 'city_name',        label: 'City name',         example: 'Rancho Palos Verdes' },
   { key: 'county',           label: 'County',            example: 'Los Angeles' },
