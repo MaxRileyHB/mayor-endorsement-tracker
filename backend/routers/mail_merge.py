@@ -45,6 +45,7 @@ def _first_name(name: str) -> str:
 
 FIELD_TAGS = {
     "mayor_first_name": lambda c: _first_name(c.mayor or ""),
+    "mayor_last_name":  lambda c: c.mayor_last_name or "",
     "mayor_full_name":  lambda c: c.mayor or "",
     "city_name":        lambda c: c.city_name or "",
     "county":           lambda c: c.county or "",
