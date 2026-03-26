@@ -47,7 +47,7 @@ FIELD_TAGS = {
     "mayor_first_name": lambda c: _first_name(c.mayor or ""),
     "mayor_last_name":  lambda c: c.mayor_last_name or "",
     "mayor_full_name":  lambda c: c.mayor or "",
-    "city_name":        lambda c: c.city_name or "",
+    "city_name":        lambda c: re.sub(r'^(?:City|Town) of\s+', '', c.city_name or ""),
     "county":           lambda c: c.county or "",
     "population":       lambda c: f"{c.population:,}" if c.population else "",
     "mayor_title":      lambda c: "Mayor",
