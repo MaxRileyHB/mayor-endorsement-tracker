@@ -352,14 +352,16 @@ export default function CityDetailPanel({ city, onClose, onUpdate, onOptimisticU
                   return (
                     <>
                       <ContactField label="Work Email" value={city.mayor_work_email} editable
-                        onSave={v => save({ mayor_work_email: v })}
-                        sourceUrl={city.mayor_work_email_source} wasSearched={wasSearched} />
+                        onSave={v => save({ mayor_work_email: v, mayor_work_email_invalid: false })}
+                        sourceUrl={city.mayor_work_email_source} wasSearched={wasSearched}
+                        invalid={city.mayor_work_email_invalid} />
                       <ContactField label="Work Phone" value={city.mayor_work_phone} editable
                         onSave={v => save({ mayor_work_phone: v })}
                         sourceUrl={city.mayor_work_phone_source} wasSearched={wasSearched} />
                       <ContactField label="Personal Email" value={city.mayor_personal_email} editable
-                        onSave={v => save({ mayor_personal_email: v })}
-                        sourceUrl={city.mayor_personal_email_source} wasSearched={wasSearched} />
+                        onSave={v => save({ mayor_personal_email: v, mayor_personal_email_invalid: false })}
+                        sourceUrl={city.mayor_personal_email_source} wasSearched={wasSearched}
+                        invalid={city.mayor_personal_email_invalid} />
                       <ContactField label="Personal Phone" value={city.mayor_personal_phone} editable
                         onSave={v => save({ mayor_personal_phone: v })}
                         sourceUrl={city.mayor_personal_phone_source} wasSearched={wasSearched} />
@@ -906,7 +908,7 @@ function MayorField({ value, flagged, onSave }) {
   )
 }
 
-function ContactField({ label, value, link, editable, onSave, sourceUrl, wasSearched }) {
+function ContactField({ label, value, link, editable, onSave, sourceUrl, wasSearched, invalid }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(value || '')
 
@@ -939,11 +941,18 @@ function ContactField({ label, value, link, editable, onSave, sourceUrl, wasSear
               className="text-blue-600 hover:underline truncate">{value}</a>
           ) : (
             <span
-              className={`text-gray-700 truncate ${editable ? 'cursor-pointer hover:text-blue-600' : ''}`}
-              onClick={() => editable && setEditing(true)}
+              className={`truncate ${invalid ? 'line-through text-red-400' : 'text-gray-700'} ${editable && !invalid ? 'cursor-pointer hover:text-blue-600' : ''}`}
+              onClick={() => editable && !invalid && setEditing(true)}
             >{value}</span>
           )}
-          {sourceUrl && (
+          {invalid && (
+            <span title="Delivery failed — email bounced" className="text-red-400 shrink-0">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </span>
+          )}
+          {sourceUrl && !invalid && (
             <a href={sourceUrl} target="_blank" rel="noreferrer"
               title={`Source: ${sourceUrl}`}
               className="text-gray-300 hover:text-blue-400 shrink-0"

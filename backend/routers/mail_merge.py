@@ -188,15 +188,19 @@ def _apply_filters(db: Session, filters: MergeFilters) -> list[City]:
 
 
 def _resolve_email(city: City, priority: list[str]) -> tuple[str | None, str | None]:
-    """Return (email_address, source_key) using the priority cascade."""
+    """Return (email_address, source_key) using the priority cascade, skipping invalid addresses."""
     field_map = {
         "mayor_work":     city.mayor_work_email,
         "mayor_personal": city.mayor_personal_email,
         "city":           city.city_email,
     }
+    invalid_map = {
+        "mayor_work":     city.mayor_work_email_invalid,
+        "mayor_personal": city.mayor_personal_email_invalid,
+    }
     for field in priority:
         val = field_map.get(field)
-        if val:
+        if val and not invalid_map.get(field, False):
             return val, field
     return None, None
 

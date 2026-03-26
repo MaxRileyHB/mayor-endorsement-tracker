@@ -237,11 +237,18 @@ def sync_emails(db: Session = Depends(get_db)):
         # Detect direction
         direction = "outbound" if from_email == our_email else "inbound"
 
+        # Detect bounce / delivery failure notifications
+        is_bounce = _is_bounce_email(from_email, subject)
+
         # Extract body (full, no truncation)
         body_preview = _extract_body(msg.get("payload", {}))
 
         # Match to city
         city_id = _match_city(db, from_email, to_email, thread_id)
+
+        # If this is a bounce, mark the bounced address as invalid on the city
+        if is_bounce and thread_id:
+            _handle_bounce(db, thread_id, body_preview)
 
         email = Email(
             city_id=city_id,
@@ -254,7 +261,8 @@ def sync_emails(db: Session = Depends(get_db)):
             body_preview=body_preview,
             sent_at=sent_at,
             is_draft=False,
-            is_read=(direction == "outbound"),  # inbound starts unread
+            is_read=(direction == "outbound") or is_bounce,  # bounces auto-read
+            is_bounce=is_bounce,
         )
         db.add(email)
         synced += 1
@@ -289,10 +297,63 @@ def _extract_body(payload: dict) -> str:
     return ""
 
 
+_BOUNCE_FROM_PATTERNS = ("mailer-daemon", "postmaster")
+_BOUNCE_SUBJECT_KEYWORDS = (
+    "delivery status notification",
+    "mail delivery failed",
+    "undeliverable",
+    "delivery failure",
+    "returned mail",
+    "failed delivery",
+)
+
+
+def _is_bounce_email(from_email: str, subject: str) -> bool:
+    from_lower = from_email.lower()
+    if any(from_lower.startswith(p) for p in _BOUNCE_FROM_PATTERNS):
+        return True
+    subject_lower = subject.lower()
+    return any(kw in subject_lower for kw in _BOUNCE_SUBJECT_KEYWORDS)
+
+
+def _handle_bounce(db: Session, thread_id: str, body_preview: str) -> None:
+    """Find the outbound email in this thread and mark its recipient address invalid on the city."""
+    original = (
+        db.query(Email)
+        .filter(Email.gmail_thread_id == thread_id, Email.direction == "outbound")
+        .order_by(Email.sent_at)
+        .first()
+    )
+    if not original or not original.city_id or not original.to_address:
+        return
+
+    bounced_addr = extract_email_addr(original.to_address)
+    city = db.query(City).filter(City.id == original.city_id).first()
+    if not city:
+        return
+
+    if city.mayor_work_email and extract_email_addr(city.mayor_work_email) == bounced_addr:
+        city.mayor_work_email_invalid = True
+    elif city.mayor_personal_email and extract_email_addr(city.mayor_personal_email) == bounced_addr:
+        city.mayor_personal_email_invalid = True
+
+    db.add(ActivityLog(
+        city_id=city.id,
+        action="email_bounced",
+        details=f"Delivery failed for {bounced_addr}",
+    ))
+
+
+def extract_email_addr(s: str) -> str:
+    m = re.search(r'[\w.+-]+@[\w.-]+\.\w+', s)
+    return m.group(0).lower() if m else s.lower()
+
+
 @router.get("/emails/unread-cities")
 def get_unread_cities(db: Session = Depends(get_db)):
     rows = db.query(Email.city_id).filter(
         Email.is_read == False,
+        Email.is_bounce == False,
         Email.city_id.isnot(None),
     ).distinct().all()
     return {"city_ids": [r[0] for r in rows]}

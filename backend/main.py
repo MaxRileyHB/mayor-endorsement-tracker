@@ -35,6 +35,10 @@ try:
         _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS contact_scrape_log TEXT"))
         _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS city_blurb TEXT"))
         _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS mayor_last_name VARCHAR(255)"))
+        # Bounce / invalid email tracking
+        _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS mayor_work_email_invalid BOOLEAN NOT NULL DEFAULT FALSE"))
+        _conn.execute(text("ALTER TABLE cities ADD COLUMN IF NOT EXISTS mayor_personal_email_invalid BOOLEAN NOT NULL DEFAULT FALSE"))
+        _conn.execute(text("ALTER TABLE emails ADD COLUMN IF NOT EXISTS is_bounce BOOLEAN NOT NULL DEFAULT FALSE"))
         # Recompute outreach_tier using the algorithmic email tier system
         _conn.execute(text("""
             UPDATE cities SET outreach_tier =

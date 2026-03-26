@@ -27,10 +27,12 @@ class CityBase(BaseModel):
     mayor_contact_source: Optional[str] = None
     mayor_work_email: Optional[str] = None
     mayor_work_email_source: Optional[str] = None
+    mayor_work_email_invalid: Optional[bool] = False
     mayor_work_phone: Optional[str] = None
     mayor_work_phone_source: Optional[str] = None
     mayor_personal_email: Optional[str] = None
     mayor_personal_email_source: Optional[str] = None
+    mayor_personal_email_invalid: Optional[bool] = False
     mayor_personal_phone: Optional[str] = None
     mayor_personal_phone_source: Optional[str] = None
     mayor_instagram: Optional[str] = None
@@ -82,8 +84,10 @@ class CityUpdate(BaseModel):
     mayor_phone: Optional[str] = None
     mayor_contact_source: Optional[str] = None
     mayor_work_email: Optional[str] = None
+    mayor_work_email_invalid: Optional[bool] = None
     mayor_work_phone: Optional[str] = None
     mayor_personal_email: Optional[str] = None
+    mayor_personal_email_invalid: Optional[bool] = None
     mayor_personal_phone: Optional[str] = None
     mayor_instagram: Optional[str] = None
     mayor_facebook: Optional[str] = None
@@ -142,6 +146,7 @@ class EmailRead(BaseModel):
     body_preview: Optional[str] = None
     sent_at: Optional[datetime] = None
     is_draft: Optional[bool] = False
+    is_bounce: Optional[bool] = False
     draft_type: Optional[str] = None
     draft_status: Optional[str] = None
     created_at: Optional[datetime] = None
